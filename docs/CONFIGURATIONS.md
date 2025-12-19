@@ -63,7 +63,6 @@
 | `AS_DOCUMENT`            | `bool`          | Upload leeched files as documents. Default: `False` (uploads as media). |
 | `USER_TRANSMISSION`      | `bool`          | Use user session for uploads/downloads in supergroups. Default: `False`. |
 | `HYBRID_LEECH`           | `bool`          | Switch between bot and user sessions for leeching based on file size. Default: `False`. |
-| `LEECH_FILENAME_PREFIX`  | `str`           | Prefix to add to leeched file names. |
 | `LEECH_DUMP_CHAT`        | `list[str/int]` | Chat/Channel ID(s) to send leeched files. Use `-100` prefix for private channels or `chat_id|thread_id` for topics. |
 | `THUMBNAIL_LAYOUT`       | `str`           | Layout like `2x2`, `4x4`, `3x3`, etc. |
 
@@ -135,3 +134,4 @@
 | `INSTADL_API`          | `str`  | URL or endpoint for InstaDL API integration. |
 | `HEROKU_APP_NAME`      | `str`  | Name of your Heroku app, used to get `BASE_URL` automatically. |
 | `HEROKU_API_KEY`       | `str`  | API key for accessing and controlling your Heroku app. |
+| `NAME_PREFIX`          | `str`  | Name prefix. |

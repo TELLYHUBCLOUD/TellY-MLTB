@@ -36,7 +36,6 @@ no_thumb = "https://graph.org/file/73ae908d18c6b38038071.jpg"
 leech_options = [
     "THUMBNAIL",
     "LEECH_SPLIT_SIZE",
-    "LEECH_FILENAME_PREFIX",
     "LEECH_FILENAME_CAPTION",
     "THUMBNAIL_LAYOUT",
     "USER_DUMP",
@@ -59,18 +58,6 @@ async def get_user_settings(from_user, stype="main"):
 
     if stype == "leech":
         buttons.data_button("thumbnail", f"userset {user_id} menu THUMBNAIL")
-        buttons.data_button(
-            "Leech Prefix",
-            f"userset {user_id} menu LEECH_FILENAME_PREFIX",
-        )
-        if user_dict.get("LEECH_FILENAME_PREFIX", False):
-            lprefix = user_dict["LEECH_FILENAME_PREFIX"]
-        elif (
-            "LEECH_FILENAME_PREFIX" not in user_dict and Config.LEECH_FILENAME_PREFIX
-        ):
-            lprefix = Config.LEECH_FILENAME_PREFIX
-        else:
-            lprefix = "None"
         buttons.data_button(
             "Leech Caption",
             f"userset {user_id} menu LEECH_FILENAME_CAPTION",
@@ -142,7 +129,6 @@ async def get_user_settings(from_user, stype="main"):
         text = f"""<u>Leech Settings for {name}</u>
 Leech Type is <b>{ltype}</b>
 Media Group is <b>{media_group}</b>
-Leech Prefix is <code>{escape(lprefix)}</code>
 Leech Caption is <code>{escape(lcap)}</code>
 User session is {usess}
 User dump <code>{udump}</code>
@@ -351,6 +337,13 @@ Add to Playlist ID: <code>{yt_add_to_playlist_id}</code>"""
             "Name Subtitute",
             f"userset {user_id} menu NAME_SUBSTITUTE",
         )
+        if user_dict.get("NAME_PREFIX", False):
+            np_msg = user_dict["NAME_PREFIX"]
+        elif "NAME_PREFIX" not in user_dict:
+            np_msg = excluded_extensions
+        else:
+            np_msg = "None"
+        buttons.data_button("Name Prefix", f"userset {user_id} menu NAME_PREFIX")
 
         buttons.data_button(
             "YT-DLP Options",
@@ -397,6 +390,7 @@ Use <b>{tr}</b> token/config
 Upload Paths is <code>{upload_paths}</code>
 
 Name substitution is <code>{ns_msg}</code>
+Name prefix is <code>{np_msg}</code>
 Excluded Extensions is <code>{ex_ex}</code>
 YT-DLP Options is <code>{ytopt}</code>
 FFMPEG Commands is <code>{ffc}</code>

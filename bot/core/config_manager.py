@@ -29,7 +29,6 @@ class Config:
     JD_PASS: str = ""
     IS_TEAM_DRIVE: bool = False
     LEECH_DUMP_CHAT: ClassVar[list[str]] = []
-    LEECH_FILENAME_PREFIX: str = ""
     LEECH_SPLIT_SIZE: int = 2097152000
     MEDIA_GROUP: bool = False
     HYBRID_LEECH: bool = False
@@ -81,6 +80,7 @@ class Config:
     INSTADL_API: str = ""
     HEROKU_APP_NAME: str = ""
     HEROKU_API_KEY: str = ""
+    NAME_PREFIX: str = ""
 
     @classmethod
     def _convert(cls, key, value):

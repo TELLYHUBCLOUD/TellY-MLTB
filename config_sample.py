@@ -44,6 +44,7 @@ LEECH_FILENAME_CAPTION = ""  # Template caption for leeched files
 HYDRA_IP = ""  # IP of NZBHydra2 instance
 HYDRA_API_KEY = ""  # API key for NZBHydra2
 INSTADL_API = ""  # URL/endpoint for InstaDL API
+NAME_PREFIX = ""
 
 # GDrive Tools
 GDRIVE_ID = ""  # Default Google Drive Folder/TeamDrive ID or "root"
@@ -95,7 +96,6 @@ USER_TRANSMISSION = False  # Use user session for uploads/downloads (Premium onl
 HYBRID_LEECH = (
     False  # Switch between bot/user session based on file size (Premium only)
 )
-LEECH_FILENAME_PREFIX = ""  # Prefix for leeched filenames
 LEECH_DUMP_CHAT = []  # List of chat_ids or channel_ids to dump leeched files, e.g., [-100123456789, "channel_username"]
 THUMBNAIL_LAYOUT = ""  # Thumbnail layout for uploads (e.g., 2x2, 3x3)
 

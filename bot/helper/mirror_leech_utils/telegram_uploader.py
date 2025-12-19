@@ -4,7 +4,6 @@ from logging import getLogger
 from os import path as ospath
 from os import walk
 from re import match as re_match
-from re import sub as re_sub
 from time import time
 
 from aiofiles.os import (
@@ -67,7 +66,6 @@ class TelegramUploader:
         self._media_dict = {"videos": {}, "documents": {}}
         self._last_msg_in_group = False
         self._up_path = ""
-        self._lprefix = ""
         self._user_dump = ""
         self._lcaption = ""
         self._media_group = False
@@ -93,9 +91,9 @@ class TelegramUploader:
             if "MEDIA_GROUP" not in self._listener.user_dict
             else False
         )
-        self._lprefix = self._listener.user_dict.get("LEECH_FILENAME_PREFIX") or (
-            Config.LEECH_FILENAME_PREFIX
-            if "LEECH_FILENAME_PREFIX" not in self._listener.user_dict
+        self._nprefix = self._listener.user_dict.get("NAME_PREFIX") or (
+            Config.NAME_PREFIX
+            if "NAME_PREFIX" not in self._listener.user_dict
             else ""
         )
         self._user_dump = self._listener.user_dict.get("USER_DUMP")
@@ -151,16 +149,7 @@ class TelegramUploader:
     async def _prepare_file(self, file_, dirpath):
         if self._lcaption:
             cap_mono = await generate_caption(file_, dirpath, self._lcaption)
-        if self._lprefix:
-            if not self._lcaption:
-                cap_mono = f"{self._lprefix} {file_}"
-            self._lprefix = re_sub("<.*?>", "", self._lprefix)
-            new_path = ospath.join(dirpath, f"{self._lprefix} {file_}")
-            LOGGER.info(self._up_path)
-            await rename(self._up_path, new_path)
-            self._up_path = new_path
-            LOGGER.info(self._up_path)
-        if not self._lcaption and not self._lprefix:
+        if not self._lcaption:
             cap_mono = f"<code>{file_}</code>"
         if len(file_) > 60:
             if is_archive(file_):

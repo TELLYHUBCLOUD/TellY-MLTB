@@ -187,7 +187,7 @@ def source(self):
 
 
 async def get_readable_message(sid, is_user, page_no=1, status="All", page_step=1):
-    msg = f"<blockquote><a href=\"https://t.me/telly_mirror\">Join TellY Mirror</a></blockquote>\n"
+    msg = '<blockquote><a href="https://t.me/telly_mirror">Join TellY Mirror</a></blockquote>\n'
     button = None
     tasks = await get_specific_tasks(status, sid if is_user else None)
     STATUS_LIMIT = 4

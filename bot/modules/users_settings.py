@@ -586,7 +586,7 @@ async def add_file(_, message, ftype):
         des_dir = f"{tpath}{user_id}.pickle"
         await message.download(file_name=des_dir)  # TODO user font
     elif ftype == "WM_IMAGE":
-        wpath = f"watermarks/"
+        wpath = "watermarks/"
         await makedirs(wpath, exist_ok=True)
         des_dir = f"{wpath}{user_id}.png"
         await message.download(file_name=des_dir)
@@ -690,7 +690,9 @@ async def get_watermark_menu(message, user_id):
     user_dict = user_data.get(user_id, {})
     buttons = ButtonMaker()
 
-    wm_key = user_dict.get("WATERMARK_KEY") or (Config.WATERMARK_KEY if "WATERMARK_KEY" not in user_dict else None)
+    wm_key = user_dict.get("WATERMARK_KEY") or (
+        Config.WATERMARK_KEY if "WATERMARK_KEY" not in user_dict else None
+    )
 
     # If it's a string, it's just the text. If it's a dict, it has settings.
     if isinstance(wm_key, str):
@@ -719,7 +721,7 @@ async def get_watermark_menu(message, user_id):
         buttons.data_button("Set Image", f"userset {user_id} file WM_IMAGE")
 
     if wm_key:
-         buttons.data_button("Reset All", f"userset {user_id} reset WATERMARK_KEY")
+        buttons.data_button("Reset All", f"userset {user_id} reset WATERMARK_KEY")
 
     buttons.data_button("Back", f"userset {user_id} back")
     buttons.data_button("Close", f"userset {user_id} close")
@@ -728,7 +730,7 @@ async def get_watermark_menu(message, user_id):
 Text: <code>{text_val}</code>
 Position: <b>{pos_val}</b>
 Size: <b>{size_val}</b>
-Image: <b>{'Set' if image_exists else 'Not Set'}</b>
+Image: <b>{"Set" if image_exists else "Not Set"}</b>
 """
     await edit_message(message, text_msg, buttons.build_menu(2))
 
@@ -749,8 +751,8 @@ async def set_watermark_option(_, message, option):
         wm_key["text"] = value
     elif option == "size":
         if not value.isdigit():
-             await send_message(message, "Size must be a number!")
-             return
+            await send_message(message, "Size must be a number!")
+            return
         wm_key["size"] = value
     # Position is handled via menu, but if text input is needed for custom pos
     elif option == "position":
@@ -762,7 +764,7 @@ async def set_watermark_option(_, message, option):
     # Refresh menu
     # We can't easily refresh menu here because we don't have the original message object to edit.
     # But usually the flow goes back to menu.
-    msg, btn, _ = await get_user_settings(message.from_user)
+    _msg, _btn, _ = await get_user_settings(message.from_user)
     # This sends main settings again, which is not ideal but acceptable or we can try to get back to watermark menu
     # Ideally we should store the last menu message id to edit it.
     # For now, let's just send a confirmation or try to re-open the menu if possible.
@@ -964,7 +966,13 @@ async def edit_user_settings(client, query):
         option = data[3]
         if option == "position":
             buttons = ButtonMaker()
-            for pos in ["Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right", "Center"]:
+            for pos in [
+                "Top-Left",
+                "Top-Right",
+                "Bottom-Left",
+                "Bottom-Right",
+                "Center",
+            ]:
                 buttons.data_button(pos, f"userset {user_id} wm_set_pos {pos}")
             buttons.data_button("Back", f"userset {user_id} watermark_menu")
             buttons.data_button("Close", f"userset {user_id} close")
@@ -1041,9 +1049,9 @@ async def edit_user_settings(client, query):
             document=data[3] not in ["THUMBNAIL", "WM_IMAGE"],
         )
         if data[3] == "WM_IMAGE":
-             await get_watermark_menu(message, user_id)
+            await get_watermark_menu(message, user_id)
         else:
-             await get_menu(data[3], message, user_id)
+            await get_menu(data[3], message, user_id)
     elif data[2] == "ffvar":
         await query.answer()
         key = data[3] if len(data) > 3 else None

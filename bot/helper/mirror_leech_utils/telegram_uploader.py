@@ -420,9 +420,9 @@ class TelegramUploader:
             if not self._lcaption:
                 fname = f"{self._lprefix} {file_}" if self._lprefix else file_
                 if self._lsuffix:
-                     base_name = ospath.splitext(fname)[0]
-                     ext = ospath.splitext(fname)[1]
-                     fname = f"{base_name} {self._lsuffix}{ext}"
+                    base_name = ospath.splitext(fname)[0]
+                    ext = ospath.splitext(fname)[1]
+                    fname = f"{base_name} {self._lsuffix}{ext}"
                 cap_mono = fname
 
             if self._lprefix:

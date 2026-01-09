@@ -1,6 +1,7 @@
 import json
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import PIPE
+
 from aiofiles.os import path as aiopath
 
 from bot import LOGGER, cpu_no
@@ -129,26 +130,27 @@ async def get_watermark_cmd(file, watermark_settings, user_id=None):
         # Let's use scale2ref to ensure watermark isn't huge compared to video if user didn't specify appropriately?
         # No, let's trust simple overlay for now as per requirements "production ready".
         # Fixed logic:
-        cmd.extend([
-            "-filter_complex",
-             f"overlay={overlay_opts}"
-        ])
+        cmd.extend(["-filter_complex", f"overlay={overlay_opts}"])
     elif w_text:
         # Escape single quotes for FFmpeg
         w_text = w_text.replace("'", "'\\''")
-        cmd.extend([
-            "-vf",
-            f"drawtext=text='{w_text}':fontfile={font_path}:fontsize={w_size}:fontcolor=white:{text_opts}"
-        ])
+        cmd.extend(
+            [
+                "-vf",
+                f"drawtext=text='{w_text}':fontfile={font_path}:fontsize={w_size}:fontcolor=white:{text_opts}",
+            ]
+        )
     else:
-         # No watermark
-         return None, None
+        # No watermark
+        return None, None
 
-    cmd.extend([
-        "-threads",
-        f"{max(1, cpu_no // 2)}",
-        temp_file,
-    ])
+    cmd.extend(
+        [
+            "-threads",
+            f"{max(1, cpu_no // 2)}",
+            temp_file,
+        ]
+    )
 
     return cmd, temp_file
 

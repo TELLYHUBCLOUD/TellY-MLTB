@@ -68,6 +68,7 @@ class TelegramUploader:
         self._last_msg_in_group = False
         self._up_path = ""
         self._lprefix = ""
+        self._lsuffix = ""
         self._user_dump = ""
         self._lcaption = ""
         self._media_group = False
@@ -96,6 +97,11 @@ class TelegramUploader:
         self._lprefix = self._listener.user_dict.get("LEECH_FILENAME_PREFIX") or (
             Config.LEECH_FILENAME_PREFIX
             if "LEECH_FILENAME_PREFIX" not in self._listener.user_dict
+            else ""
+        )
+        self._lsuffix = self._listener.user_dict.get("LEECH_FILENAME_SUFFIX") or (
+            Config.LEECH_FILENAME_SUFFIX
+            if "LEECH_FILENAME_SUFFIX" not in self._listener.user_dict
             else ""
         )
         self._user_dump = self._listener.user_dict.get("USER_DUMP")
@@ -410,11 +416,32 @@ class TelegramUploader:
                 self._lcaption,
                 media_info=media_info if auto_rename else None,
             )
-        if self._lprefix:
+        if self._lprefix or self._lsuffix:
             if not self._lcaption:
-                cap_mono = f"{self._lprefix} {file_}"
-            self._lprefix = re_sub("<.*?>", "", self._lprefix)
-            new_path = ospath.join(dirpath, f"{self._lprefix} {file_}")
+                fname = f"{self._lprefix} {file_}" if self._lprefix else file_
+                if self._lsuffix:
+                     base_name = ospath.splitext(fname)[0]
+                     ext = ospath.splitext(fname)[1]
+                     fname = f"{base_name} {self._lsuffix}{ext}"
+                cap_mono = fname
+
+            if self._lprefix:
+                self._lprefix = re_sub("<.*?>", "", self._lprefix)
+            if self._lsuffix:
+                self._lsuffix = re_sub("<.*?>", "", self._lsuffix)
+
+            base_name = ospath.splitext(file_)[0]
+            ext = ospath.splitext(file_)[1]
+
+            new_name = file_
+            if self._lprefix:
+                new_name = f"{self._lprefix} {new_name}"
+            if self._lsuffix:
+                base_name = ospath.splitext(new_name)[0]
+                ext = ospath.splitext(new_name)[1]
+                new_name = f"{base_name} {self._lsuffix}{ext}"
+
+            new_path = ospath.join(dirpath, new_name)
             LOGGER.info(self._up_path)
             await rename(self._up_path, new_path)
             self._up_path = new_path
@@ -425,7 +452,7 @@ class TelegramUploader:
             await rename(self._up_path, new_path)
             self._up_path = new_path
 
-        if not self._lcaption and not self._lprefix:
+        if not self._lcaption and not self._lprefix and not self._lsuffix:
             cap_mono = f"<code>{file_}</code>"
         if len(file_) > 60:
             if is_archive(file_):

@@ -1391,7 +1391,7 @@ class TaskConfig:
         checked = False
         if self.is_file:
             if is_mkv(dl_path):
-                cmd, temp_file = await get_watermark_cmd(dl_path, key)
+                cmd, temp_file = await get_watermark_cmd(dl_path, key, self.user_id)
                 if cmd:
                     if not checked:
                         checked = True
@@ -1423,7 +1423,7 @@ class TaskConfig:
                         cpu_eater_lock.release()
                         return ""
                     if is_mkv(file_path):
-                        cmd, temp_file = await get_watermark_cmd(file_path, key)
+                        cmd, temp_file = await get_watermark_cmd(file_path, key, self.user_id)
                         if cmd:
                             if not checked:
                                 checked = True

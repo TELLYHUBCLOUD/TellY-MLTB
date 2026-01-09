@@ -37,6 +37,7 @@ leech_options = [
     "THUMBNAIL",
     "LEECH_SPLIT_SIZE",
     "LEECH_FILENAME_PREFIX",
+    "LEECH_FILENAME_SUFFIX",
     "LEECH_FILENAME_CAPTION",
     "THUMBNAIL_LAYOUT",
     "USER_DUMP",
@@ -71,6 +72,18 @@ async def get_user_settings(from_user, stype="main"):
             lprefix = Config.LEECH_FILENAME_PREFIX
         else:
             lprefix = "None"
+        buttons.data_button(
+            "Leech Suffix",
+            f"userset {user_id} menu LEECH_FILENAME_SUFFIX",
+        )
+        if user_dict.get("LEECH_FILENAME_SUFFIX", False):
+            lsuffix = user_dict["LEECH_FILENAME_SUFFIX"]
+        elif (
+            "LEECH_FILENAME_SUFFIX" not in user_dict and Config.LEECH_FILENAME_SUFFIX
+        ):
+            lsuffix = Config.LEECH_FILENAME_SUFFIX
+        else:
+            lsuffix = "None"
         buttons.data_button(
             "Leech Caption",
             f"userset {user_id} menu LEECH_FILENAME_CAPTION",
@@ -143,6 +156,7 @@ async def get_user_settings(from_user, stype="main"):
 Leech Type is <b>{ltype}</b>
 Media Group is <b>{media_group}</b>
 Leech Prefix is <code>{escape(lprefix)}</code>
+Leech Suffix is <code>{escape(lsuffix)}</code>
 Leech Caption is <code>{escape(lcap)}</code>
 User session is {usess}
 User dump <code>{udump}</code>
@@ -495,7 +509,7 @@ Automatically fetches IMDB info and renames files using the template.</i>"""
         else:
             ffc = "None"
 
-        buttons.data_button("Watermark", f"userset {user_id} menu WATERMARK_KEY")
+        buttons.data_button("Watermark", f"userset {user_id} watermark_menu")
         if user_dict.get("WATERMARK_KEY", False):
             wmt = user_dict["WATERMARK_KEY"]
         elif "WATERMARK_KEY" not in user_dict and Config.WATERMARK_KEY:
@@ -571,6 +585,11 @@ async def add_file(_, message, ftype):
         await makedirs(tpath, exist_ok=True)
         des_dir = f"{tpath}{user_id}.pickle"
         await message.download(file_name=des_dir)  # TODO user font
+    elif ftype == "WM_IMAGE":
+        wpath = f"watermarks/"
+        await makedirs(wpath, exist_ok=True)
+        des_dir = f"{wpath}{user_id}.png"
+        await message.download(file_name=des_dir)
     update_user_ldata(user_id, ftype, des_dir)
     await delete_message(message)
     await database.update_user_doc(user_id, ftype, des_dir)
@@ -666,11 +685,96 @@ async def set_option(_, message, option):
     await database.update_user_data(user_id)
 
 
+async def get_watermark_menu(message, user_id):
+    handler_dict[user_id] = False
+    user_dict = user_data.get(user_id, {})
+    buttons = ButtonMaker()
+
+    wm_key = user_dict.get("WATERMARK_KEY") or (Config.WATERMARK_KEY if "WATERMARK_KEY" not in user_dict else None)
+
+    # If it's a string, it's just the text. If it's a dict, it has settings.
+    if isinstance(wm_key, str):
+        text_val = wm_key
+        pos_val = "Top-Left"
+        size_val = "20"
+        image_exists = False
+    elif isinstance(wm_key, dict):
+        text_val = wm_key.get("text", "")
+        pos_val = wm_key.get("position", "Top-Left")
+        size_val = wm_key.get("size", "20")
+        image_exists = await aiopath.exists(f"watermarks/{user_id}.png")
+    else:
+        text_val = "None"
+        pos_val = "Top-Left"
+        size_val = "20"
+        image_exists = False
+
+    buttons.data_button("Set Text", f"userset {user_id} wm_set text")
+    buttons.data_button("Set Position", f"userset {user_id} wm_set position")
+    buttons.data_button("Set Size", f"userset {user_id} wm_set size")
+
+    if image_exists:
+        buttons.data_button("Delete Image", f"userset {user_id} wm_del_image")
+    else:
+        buttons.data_button("Set Image", f"userset {user_id} file WM_IMAGE")
+
+    if wm_key:
+         buttons.data_button("Reset All", f"userset {user_id} reset WATERMARK_KEY")
+
+    buttons.data_button("Back", f"userset {user_id} back")
+    buttons.data_button("Close", f"userset {user_id} close")
+
+    text_msg = f"""<u>Watermark Settings</u>
+Text: <code>{text_val}</code>
+Position: <b>{pos_val}</b>
+Size: <b>{size_val}</b>
+Image: <b>{'Set' if image_exists else 'Not Set'}</b>
+"""
+    await edit_message(message, text_msg, buttons.build_menu(2))
+
+
+async def set_watermark_option(_, message, option):
+    user_id = message.from_user.id
+    handler_dict[user_id] = False
+    value = message.text
+    user_dict = user_data.setdefault(user_id, {})
+
+    wm_key = user_dict.get("WATERMARK_KEY", {})
+    if isinstance(wm_key, str):
+        wm_key = {"text": wm_key, "position": "Top-Left", "size": "20"}
+    elif wm_key is None:
+        wm_key = {"text": "", "position": "Top-Left", "size": "20"}
+
+    if option == "text":
+        wm_key["text"] = value
+    elif option == "size":
+        if not value.isdigit():
+             await send_message(message, "Size must be a number!")
+             return
+        wm_key["size"] = value
+    # Position is handled via menu, but if text input is needed for custom pos
+    elif option == "position":
+        wm_key["position"] = value
+
+    user_dict["WATERMARK_KEY"] = wm_key
+    await delete_message(message)
+    await database.update_user_data(user_id)
+    # Refresh menu
+    # We can't easily refresh menu here because we don't have the original message object to edit.
+    # But usually the flow goes back to menu.
+    msg, btn, _ = await get_user_settings(message.from_user)
+    # This sends main settings again, which is not ideal but acceptable or we can try to get back to watermark menu
+    # Ideally we should store the last menu message id to edit it.
+    # For now, let's just send a confirmation or try to re-open the menu if possible.
+    # Since we are in a message handler, we can send a new message with the menu.
+    await get_watermark_menu(message, user_id)
+
+
 async def get_menu(option, message, user_id):
     handler_dict[user_id] = False
     user_dict = user_data.get(user_id, {})
     buttons = ButtonMaker()
-    if option in ["THUMBNAIL", "RCLONE_CONFIG", "TOKEN_PICKLE"]:
+    if option in ["THUMBNAIL", "RCLONE_CONFIG", "TOKEN_PICKLE", "WM_IMAGE"]:
         key = "file"
     else:
         key = "set"
@@ -852,6 +956,47 @@ async def edit_user_settings(client, query):
             await update_user_settings(query, "youtube_folder_mode_menu")
         else:
             await get_menu(data[3], message, user_id)
+    elif data[2] == "watermark_menu":
+        await query.answer()
+        await get_watermark_menu(message, user_id)
+    elif data[2] == "wm_set":
+        await query.answer()
+        option = data[3]
+        if option == "position":
+            buttons = ButtonMaker()
+            for pos in ["Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right", "Center"]:
+                buttons.data_button(pos, f"userset {user_id} wm_set_pos {pos}")
+            buttons.data_button("Back", f"userset {user_id} watermark_menu")
+            buttons.data_button("Close", f"userset {user_id} close")
+            await edit_message(message, "Choose Position:", buttons.build_menu(2))
+        else:
+            buttons = ButtonMaker()
+            text = f"Send {option}. Timeout: 60 sec"
+            buttons.data_button("Back", f"userset {user_id} watermark_menu")
+            buttons.data_button("Close", f"userset {user_id} close")
+            await edit_message(message, text, buttons.build_menu(1))
+            pfunc = partial(set_watermark_option, option=option)
+            await event_handler(client, query, pfunc)
+    elif data[2] == "wm_set_pos":
+        await query.answer()
+        value = data[3]
+        user_dict = user_data.setdefault(user_id, {})
+        wm_key = user_dict.get("WATERMARK_KEY", {})
+        if isinstance(wm_key, str):
+            wm_key = {"text": wm_key, "position": value, "size": "20"}
+        elif wm_key is None:
+            wm_key = {"text": "", "position": value, "size": "20"}
+        else:
+            wm_key["position"] = value
+        user_dict["WATERMARK_KEY"] = wm_key
+        await database.update_user_data(user_id)
+        await get_watermark_menu(message, user_id)
+    elif data[2] == "wm_del_image":
+        await query.answer("Image Deleted!", show_alert=True)
+        img_path = f"watermarks/{user_id}.png"
+        if await aiopath.exists(img_path):
+            await remove(img_path)
+        await get_watermark_menu(message, user_id)
     elif data[2] == "set_yt_folder_mode":
         await query.answer()
         new_mode = data[3]
@@ -878,6 +1023,8 @@ async def edit_user_settings(client, query):
         buttons = ButtonMaker()
         if data[3] == "THUMBNAIL":
             text = "Send a photo to save it as custom thumbnail. Timeout: 60 sec"
+        elif data[3] == "WM_IMAGE":
+            text = "Send a png image to save it as watermark. Timeout: 60 sec"
         elif data[3] == "RCLONE_CONFIG":
             text = "Send rclone.conf. Timeout: 60 sec"
         else:
@@ -890,10 +1037,13 @@ async def edit_user_settings(client, query):
             client,
             query,
             pfunc,
-            photo=data[3] == "THUMBNAIL",
-            document=data[3] != "THUMBNAIL",
+            photo=data[3] in ["THUMBNAIL", "WM_IMAGE"],
+            document=data[3] not in ["THUMBNAIL", "WM_IMAGE"],
         )
-        await get_menu(data[3], message, user_id)
+        if data[3] == "WM_IMAGE":
+             await get_watermark_menu(message, user_id)
+        else:
+             await get_menu(data[3], message, user_id)
     elif data[2] == "ffvar":
         await query.answer()
         key = data[3] if len(data) > 3 else None

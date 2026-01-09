@@ -30,6 +30,7 @@ class Config:
     IS_TEAM_DRIVE: bool = False
     LEECH_DUMP_CHAT: ClassVar[list[str]] = []
     LEECH_FILENAME_PREFIX: str = ""
+    LEECH_FILENAME_SUFFIX: str = ""
     LEECH_SPLIT_SIZE: int = 2097152000
     MEDIA_GROUP: bool = False
     HYBRID_LEECH: bool = False

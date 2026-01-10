@@ -17,7 +17,6 @@ from pyrogram.enums import ChatAction
 from bot import (
     DOWNLOAD_DIR,
     LOGGER,
-    cores,
     cpu_eater_lock,
     excluded_extensions,
     included_extensions,
@@ -1567,7 +1566,9 @@ class TaskConfig:
                         cpu_eater_lock.release()
                         return ""
                     if is_mkv(file_path):
-                        cmd, temp_file = await get_watermark_cmd(file_path, key, self.user_id)
+                        cmd, temp_file = await get_watermark_cmd(
+                            file_path, key, self.user_id
+                        )
                         if cmd:
                             if not checked:
                                 checked = True

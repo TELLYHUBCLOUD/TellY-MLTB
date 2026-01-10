@@ -1,25 +1,15 @@
-from asyncio import Event, wait_for
-from time import time
-from functools import partial
-from pyrogram.filters import regex, user
-from pyrogram.handlers import CallbackQueryHandler
-
-from bot import LOGGER, task_dict, task_dict_lock
-from bot.helper.telegram_helper.button_build import ButtonMaker
+from bot import LOGGER, task_dict_lock
 from bot.helper.telegram_helper.message_utils import (
-    send_message,
-    edit_message,
-    delete_message,
     auto_delete_message,
+    send_message,
 )
-from bot.helper.ext_utils.status_utils import get_readable_time
 
 # Store interactive session results globally to bridge between modules
 # key: user_id, value: bool (Proceed or Cancel)
 direct_task_results = {}
 
 # ... (Previous imports)
-from asyncio import create_task, sleep
+from asyncio import create_task
 from base64 import b64encode
 from re import match as re_match
 
@@ -28,16 +18,7 @@ from truelink import TrueLinkResolver
 from truelink.exceptions import TrueLinkException
 from truelink.types import FolderResult, LinkResult
 
-from bot import (
-    DOWNLOAD_DIR,
-    LOGGER,
-    included_extensions,
-    multi_tags,
-    task_dict,
-    task_dict_lock,
-    user_data,
-    bot_loop
-)
+from bot import DOWNLOAD_DIR, bot_loop
 from bot.core.config_manager import Config
 from bot.core.telegram_manager import TgClient
 from bot.helper.aeon_utils.access_check import error_check
@@ -45,10 +26,10 @@ from bot.helper.ext_utils.bot_utils import (
     COMMAND_USAGE,
     arg_parser,
     get_content_type,
-    new_task,
 )
+from bot.helper.ext_utils.exceptions import DirectDownloadLinkException
+from bot.helper.ext_utils.limit_checker import limit_checker
 from bot.helper.ext_utils.links_utils import (
-    get_links_from_message,
     is_gdrive_id,
     is_gdrive_link,
     is_magnet,
@@ -66,7 +47,11 @@ from bot.helper.mirror_leech_utils.download_utils.direct_downloader import (
 )
 from bot.helper.mirror_leech_utils.download_utils.gd_download import add_gd_download
 from bot.helper.mirror_leech_utils.download_utils.jd_download import add_jd_download
+from bot.helper.mirror_leech_utils.download_utils.mega_download import (
+    add_mega_download,
+)
 from bot.helper.mirror_leech_utils.download_utils.nzb_downloader import add_nzb
+
 # from bot.helper.mirror_leech_utils.download_utils.direct_link_generator import (
 #     direct_link_generator,
 # )
@@ -74,22 +59,14 @@ from bot.helper.mirror_leech_utils.download_utils.qbit_download import add_qb_to
 from bot.helper.mirror_leech_utils.download_utils.rclone_download import (
     add_rclone_download,
 )
-from bot.helper.mirror_leech_utils.download_utils.mega_download import (
-    add_mega_download,
-)
 from bot.helper.mirror_leech_utils.download_utils.telegram_download import (
     TelegramDownloadHelper,
 )
-from bot.helper.ext_utils.exceptions import DirectDownloadLinkException
-from bot.helper.ext_utils.limit_checker import limit_checker
 from bot.helper.telegram_helper.message_utils import (
-    auto_delete_message,
     delete_links,
-    get_tg_link_message,
-    send_message,
 )
 from bot.modules.media_tools import show_media_tools_for_task
-from bot.modules.clone import Clone
+
 
 class Mirror(TaskListener):
     def __init__(
@@ -137,6 +114,7 @@ class Mirror(TaskListener):
     def _ensure_user_dict(self):
         if not hasattr(self, "user_dict") or self.user_dict is None:
             from bot import user_data
+
             user_id = self.message.from_user.id if self.message.from_user else ""
             self.user_dict = user_data.get(user_id, {})
 
@@ -610,7 +588,6 @@ class Mirror(TaskListener):
             if len(parts) > 5 and parts[5]:
                 self.yt_playlist_id = parts[5]
 
-
         # Enable compression if any specific compression flag is set
         if (
             self.compress_video
@@ -745,7 +722,8 @@ class Mirror(TaskListener):
             self.user_trans = False
             self.thumbnail_layout = ""
             self.split_size = 0
-            if "-es" in args: args["-es"] = False
+            if "-es" in args:
+                args["-es"] = False
             self.as_doc = False
             self.as_med = False
 
@@ -857,15 +835,14 @@ class Mirror(TaskListener):
             )
             is_bulk = False
 
-
         # Extract bulk links if not already populated and not explicitly set as bulk
         if not is_bulk and len(self.bulk) == 0:
             from bot.helper.ext_utils.bulk_links import extract_bulk_links
+
             self.bulk = await extract_bulk_links(self.message, bulk_start, bulk_end)
             LOGGER.info(f"Extracted {len(self.bulk)} bulk links")
             if len(self.bulk) > 1:
                 is_bulk = True
-
 
         if not is_bulk:
             if self.multi > 0:
@@ -908,12 +885,13 @@ class Mirror(TaskListener):
 
         path = f"{DOWNLOAD_DIR}{self.mid}{self.folder_name}"
 
-
         # Consolidated reply_to handling
         # Priority: Media > Caption Link > Command Link
         reply_to = self.message.reply_to_message
         if not reply_to and self.message.reply_to_message_id:
-            reply_to = await self.client.get_messages(self.message.chat.id, self.message.reply_to_message_id)
+            reply_to = await self.client.get_messages(
+                self.message.chat.id, self.message.reply_to_message_id
+            )
 
         file_ = None
         if reply_to:
@@ -1061,7 +1039,8 @@ class Mirror(TaskListener):
                                     self.name = result.filename
                                 if result.headers:
                                     headers = [
-                                        f"{k}: {v}" for k, v in result.headers.items()
+                                        f"{k}: {v}"
+                                        for k, v in result.headers.items()
                                     ]
                             elif isinstance(result, FolderResult):
                                 # Handle folder result and exit early
@@ -1087,16 +1066,22 @@ class Mirror(TaskListener):
                 # Fallback to direct_link_generator with improved error handling
                 # Only if resolver didn't handle it and link has proper protocol
                 if not resolver.is_supported(self.link) and (
-                    (self.link and ("://" in self.link or self.link.startswith("magnet:")))
+                    (
+                        self.link
+                        and ("://" in self.link or self.link.startswith("magnet:"))
+                    )
                     or is_magnet(self.link)
                 ):
                     try:
                         from bot.helper.ext_utils.bot_utils import sync_to_async
-                        from bot.helper.mirror_leech_utils.download_utils.direct_link_generator import direct_link_generator
+                        from bot.helper.mirror_leech_utils.download_utils.direct_link_generator import (
+                            direct_link_generator,
+                        )
+
                         res = await sync_to_async(direct_link_generator, self.link)
                         if isinstance(res, dict):
                             # Handle folder results or detailed link info
-                            if "links" in res and res["links"]:
+                            if res.get("links"):
                                 # If it's a folder, we might need bulk handling or just take the first link
                                 # For simplicity, we'll take the first link or notify if it's too complex
                                 self.link = res["links"][0]
@@ -1107,19 +1092,27 @@ class Mirror(TaskListener):
                     except DirectDownloadLinkException as e:
                         e = str(e)
                         if "ERROR: File not found" in e:
-                            await self.on_download_error("❌ File not found. The link might be dead or expired.")
+                            await self.on_download_error(
+                                "❌ File not found. The link might be dead or expired."
+                            )
                             return None
-                        elif "ERROR: User download limit reached" in e:
-                            await self.on_download_error("❌ Download limit reached for this host. Please try again later or use a different service.")
+                        if "ERROR: User download limit reached" in e:
+                            await self.on_download_error(
+                                "❌ Download limit reached for this host. Please try again later or use a different service."
+                            )
                             return None
-                        elif "ERROR: Password required" in e:
-                            await self.on_download_error("❌ Password required. Please provide the password using -up flag if supported.")
+                        if "ERROR: Password required" in e:
+                            await self.on_download_error(
+                                "❌ Password required. Please provide the password using -up flag if supported."
+                            )
                             return None
-                        elif "ERROR: Invalid URL" in e:
+                        if "ERROR: Invalid URL" in e:
                             # Might be a local file or something else, handled below
                             pass
                         else:
-                            await self.on_download_error(f"❌ Direct link generation failed: {e}")
+                            await self.on_download_error(
+                                f"❌ Direct link generation failed: {e}"
+                            )
                             return None
                     except Exception as e:
                         LOGGER.error(f"Direct link generation failed: {e}")
@@ -1177,13 +1170,16 @@ class Mirror(TaskListener):
             pssw = args.get("-ap")
             if ussr or pssw:
                 auth = f"{ussr}:{pssw}"
-                headers.extend([
-                    f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
-                ])
+                headers.extend(
+                    [
+                        f"authorization: Basic {b64encode(auth.encode()).decode('ascii')}"
+                    ]
+                )
             await add_aria2_download(self, path, headers, ratio, seed_time)
 
         await delete_links(self.message)
         return None
+
 
 async def mirror(client, message):
     bot_loop.create_task(Mirror(client, message).new_event())
@@ -1195,6 +1191,7 @@ async def leech(client, message):
             message, "❌ Leech is disabled by the administrator."
         )
     bot_loop.create_task(Mirror(client, message, is_leech=True).new_event())
+    return None
 
 
 async def jd_mirror(client, message):
@@ -1203,6 +1200,7 @@ async def jd_mirror(client, message):
             message, "❌ JDownloader is disabled by the administrator."
         )
     bot_loop.create_task(Mirror(client, message, is_jd=True).new_event())
+    return None
 
 
 async def nzb_mirror(client, message):
@@ -1211,6 +1209,7 @@ async def nzb_mirror(client, message):
             message, "❌ NZB is disabled by the administrator."
         )
     bot_loop.create_task(Mirror(client, message, is_nzb=True).new_event())
+    return None
 
 
 async def jd_leech(client, message):
@@ -1225,6 +1224,7 @@ async def jd_leech(client, message):
     bot_loop.create_task(
         Mirror(client, message, is_leech=True, is_jd=True).new_event()
     )
+    return None
 
 
 async def nzb_leech(client, message):
@@ -1239,6 +1239,7 @@ async def nzb_leech(client, message):
     bot_loop.create_task(
         Mirror(client, message, is_leech=True, is_nzb=True).new_event()
     )
+    return None
 
 
 async def md_leech_node(client, message):
@@ -1249,3 +1250,4 @@ async def md_leech_node(client, message):
     bot_loop.create_task(
         Mirror(client, message, is_leech=True, is_md_leech=True).new_event()
     )
+    return None

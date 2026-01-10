@@ -1,13 +1,11 @@
 import asyncio
-from os import environ
 
 from aiofiles import open as aiopen
-from aiofiles.os import path as aiopath, remove, rename
-from psutil import cpu_percent, disk_usage, virtual_memory
+from aiofiles.os import path as aiopath
+from aiofiles.os import remove
 
 from bot import (
     DEFAULT_VALUES,
-    LOGGER,
     aria2_options,
     auth_chats,
     drives_ids,
@@ -19,28 +17,18 @@ from bot import (
     jd_listener_lock,
     nzb_options,
     qbit_options,
-    rss_dict,
     sudo_users,
-    task_dict,
 )
 from bot.core.config_manager import Config
 from bot.core.jdownloader_booter import jdownloader
 from bot.core.startup import update_nzb_options, update_variables
-from bot.core.telegram_manager import TgClient
 from bot.core.torrent_manager import TorrentManager
-from bot.helper.ext_utils.bot_utils import SetInterval, new_task
+from bot.helper.ext_utils.bot_utils import new_task
 from bot.helper.ext_utils.db_handler import database
-from bot.helper.ext_utils.status_utils import (
-    get_readable_file_size,
-    get_readable_time,
-)
-from bot.helper.ext_utils.task_manager import start_from_queued
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.telegram_helper.message_utils import (
     edit_message,
-    send_file,
     send_message,
-    update_all_messages,
 )
 
 
@@ -142,7 +130,9 @@ async def edit_variable(_, message, pre_message, key):
     elif key == "LEECH_SPLIT_SIZE":
         value = int(value)
     elif key == "BASE_URL":
-        await TorrentManager.aria2.changeGlobalOption({"rpc-allow-origin-all": "true"})
+        await TorrentManager.aria2.changeGlobalOption(
+            {"rpc-allow-origin-all": "true"}
+        )
     elif key == "EXCLUDED_EXTENSIONS":
         fx = value.split()
         excluded_extensions.clear()
@@ -197,9 +187,10 @@ async def edit_variable(_, message, pre_message, key):
         value = eval(value)
     Config.set(key, value)
     await database.update_config()
-    if key in ["RSS_DELAY", "RSS_SIZE_LIMIT", "TORRENT_TIMEOUT"]:
-        pass
-    elif key == "BASE_URL":
+    if (
+        key in ["RSS_DELAY", "RSS_SIZE_LIMIT", "TORRENT_TIMEOUT"]
+        or key == "BASE_URL"
+    ):
         pass
     else:
         await update_variables()
@@ -338,9 +329,7 @@ async def edit_bot_settings(client, query):
         if len(data) == 4:
             handler_dict[message.chat.id] = False
             await update_buttons(message, data[2], "editvar")
-            pfunc = partial(
-                edit_variable, pre_message=message, key=data[2]
-            )
+            pfunc = partial(edit_variable, pre_message=message, key=data[2])
             r_func = partial(update_buttons, message, "var")
             await event_handler(client, query, pfunc, r_func)
         else:
@@ -350,13 +339,9 @@ async def edit_bot_settings(client, query):
         if len(data) == 4:
             handler_dict[message.chat.id] = False
             await update_buttons(message, data[2], "editprivate")
-            pfunc = partial(
-                update_private_file, pre_message=message
-            )
+            pfunc = partial(update_private_file, pre_message=message)
             r_func = partial(update_buttons, message, "private")
-            await event_handler(
-                client, query, pfunc, r_func, document=True
-            )
+            await event_handler(client, query, pfunc, r_func, document=True)
         else:
             await update_buttons(message, data[2], "editprivate")
     elif data[1] == "editaria":
@@ -408,9 +393,10 @@ async def edit_bot_settings(client, query):
             )
         Config.set(data[2], value)
         await database.update_config()
-        if data[2] in ["RSS_DELAY", "RSS_SIZE_LIMIT", "TORRENT_TIMEOUT"]:
-            pass
-        elif data[2] == "BASE_URL":
+        if (
+            data[2] in ["RSS_DELAY", "RSS_SIZE_LIMIT", "TORRENT_TIMEOUT"]
+            or data[2] == "BASE_URL"
+        ):
             pass
         else:
             await update_variables()

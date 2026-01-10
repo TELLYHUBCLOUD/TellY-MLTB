@@ -1,10 +1,7 @@
 from asyncio import create_subprocess_exec, create_subprocess_shell, sleep
-from os import environ
 
-import aiohttp
 from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath
-from dotenv import load_dotenv
 
 from bot import (
     LOGGER,
@@ -31,7 +28,10 @@ async def update_qb_options():
     if not qbit_options:
         opt = await TorrentManager.qbittorrent.app.preferences()
         qbit_options.update(opt)
-    if not await aiopath.exists("qbit_options.dict") and await database.get_qbit_data():
+    if (
+        not await aiopath.exists("qbit_options.dict")
+        and await database.get_qbit_data()
+    ):
         await database.update_qbit_config()
     elif await aiopath.exists("qbit_options.dict"):
         if await database.get_qbit_data():
@@ -48,7 +48,10 @@ async def update_aria2_options():
     if not aria2_options:
         op = await TorrentManager.aria2.getGlobalOption()
         aria2_options.update(op)
-    if not await aiopath.exists("aria2_options.dict") and await database.get_aria2_data():
+    if (
+        not await aiopath.exists("aria2_options.dict")
+        and await database.get_aria2_data()
+    ):
         await database.update_aria2_config()
     elif await aiopath.exists("aria2_options.dict"):
         if await database.get_aria2_data():

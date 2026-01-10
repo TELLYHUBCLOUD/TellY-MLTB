@@ -6,7 +6,7 @@ from logging import (
     basicConfig,
     getLogger,
 )
-from os import makedirs, path, cpu_count
+from os import cpu_count, makedirs, path
 from socket import gethostname
 
 from dotenv import load_dotenv
@@ -39,13 +39,17 @@ basicConfig(
 )
 
 for handler in getLogger().handlers:
-    handler.setFormatter(CustomFormatter(handler.formatter._fmt, handler.formatter.datefmt))
+    handler.setFormatter(
+        CustomFormatter(handler.formatter._fmt, handler.formatter.datefmt)
+    )
 
 LOGGER = getLogger(__name__)
 
 cpu_no = cpu_count()
-threads = max(1, cpu_no // 2) # Dynamic threads
-cores = "" # Not used directly if we remove taskset, or generate dynamically if needed
+threads = max(1, cpu_no // 2)  # Dynamic threads
+cores = (
+    ""  # Not used directly if we remove taskset, or generate dynamically if needed
+)
 
 DOWNLOAD_DIR = "/app/downloads/"
 intervals = {

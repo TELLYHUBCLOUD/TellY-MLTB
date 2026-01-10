@@ -1,8 +1,5 @@
 from bot.core.config_manager import Config
-from bot.core.telegram_manager import TgClient
-from bot.helper.aeon_utils.shorteners import short
 from bot.helper.ext_utils.db_handler import database
-from bot.helper.ext_utils.help_messages import nsfw_keywords
 from bot.helper.telegram_helper.message_utils import send_message
 
 

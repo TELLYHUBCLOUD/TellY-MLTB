@@ -18,6 +18,7 @@ class Config:
     DATABASE_URL: str = ""
     DEFAULT_UPLOAD: str = "gd"
     EXCLUDED_EXTENSIONS: str = ""
+    INCLUDED_EXTENSIONS: str = ""
     FFMPEG_CMDS: ClassVar[dict[str, list[str]]] = {}
     FILELION_API: str = ""
     GDRIVE_ID: str = ""
@@ -29,14 +30,13 @@ class Config:
     JD_PASS: str = ""
     IS_TEAM_DRIVE: bool = False
     LEECH_DUMP_CHAT: ClassVar[list[str]] = []
-    LEECH_FILENAME_PREFIX: str = ""
     LEECH_FILENAME_SUFFIX: str = ""
     LEECH_SPLIT_SIZE: int = 2097152000
     MEDIA_GROUP: bool = False
     HYBRID_LEECH: bool = False
     HYDRA_IP: str = ""
     HYDRA_API_KEY: str = ""
-    NAME_SUBSTITUTE: str = ""
+    NAME_SUBSTITUTE: str = r""
     OWNER_ID: int = 0
     QUEUE_ALL: int = 0
     QUEUE_DOWNLOAD: int = 0
@@ -82,6 +82,7 @@ class Config:
     INSTADL_API: str = ""
     HEROKU_APP_NAME: str = ""
     HEROKU_API_KEY: str = ""
+    NAME_PREFIX: str = ""
 
     @classmethod
     def _convert(cls, key, value):

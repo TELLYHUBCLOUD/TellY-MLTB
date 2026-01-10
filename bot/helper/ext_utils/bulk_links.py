@@ -1,85 +1,62 @@
-from aiofiles import open as aiopen
-from aiofiles.os import remove
+from re import split as re_split
+
+from bot.helper.ext_utils.bot_utils import new_task
 
 
-def filter_links(links_list: list, bulk_start: int, bulk_end: int) -> list:
-    """
-    Filters a list of links based on start and end indices.
-
-    Args:
-        links_list: The list of links to filter.
-        bulk_start: The starting index (1-based). If 0, no start filtering.
-        bulk_end: The ending index. If 0, no end filtering.
-
-    Returns:
-        The filtered list of links.
-    """
-    if bulk_start != 0 and bulk_end != 0:
-        links_list = links_list[bulk_start:bulk_end]
-    elif bulk_start != 0:
-        links_list = links_list[bulk_start:]
-    elif bulk_end != 0:
-        links_list = links_list[:bulk_end]
-    return links_list
+def filter_links(links_list, bulk_start, bulk_end):
+    start = bulk_start if bulk_start > 0 else None
+    end = bulk_end if bulk_end > 0 else None
+    return links_list[start:end]
 
 
 def get_links_from_message(text: str) -> list:
     """
-    Extracts links from a string, assuming one link per line.
-    Empty lines are ignored.
+    Extracts all links from a text string.
 
     Args:
-        text: The string containing links.
+        text: The text to extract links from.
 
     Returns:
-        A list of extracted links.
+        A list of links found in the text.
     """
-    links_list = text.split("\n")
-    return [item.strip() for item in links_list if len(item) != 0]
-
-
-async def get_links_from_file(message) -> list:
-    """
-    Downloads a text file attached to a Pyrogram message and extracts links from it,
-    assuming one link per line. Empty lines are ignored.
-
-    Args:
-        message: The Pyrogram message object with the attached text file.
-
-    Returns:
-        A list of extracted links.
-    """
-    links_list = []
-    text_file_dir = await message.download()
-    async with aiopen(text_file_dir, "r+") as f:
-        lines = await f.readlines()
-        links_list.extend(line.strip() for line in lines if len(line) != 0)
-    await remove(text_file_dir)
-    return links_list
+    if not text:
+        return []
+    links = []
+    for link in re_split(r"\s+", text):
+        if link.startswith("http") or link.startswith("magnet"):
+            links.append(link)
+    return links
 
 
 async def extract_bulk_links(message, bulk_start: str, bulk_end: str) -> list:
     """
-    Extracts bulk links from a Pyrogram message.
-    Links can be in the replied-to message's text or an attached text file.
-    The extracted links are then filtered based on start and end indices.
+    Extracts links from a message or a file attached to the message.
 
     Args:
-        message: The Pyrogram message object.
-        bulk_start: The starting index for filtering (string, converted to int).
-        bulk_end: The ending index for filtering (string, converted to int).
+        message: The Telegram message object.
+        bulk_start: The starting index for bulk processing.
+        bulk_end: The ending index for bulk processing.
 
     Returns:
-        A list of filtered links.
+        A list of links.
     """
     bulk_start = int(bulk_start)
     bulk_end = int(bulk_end)
-    links_list = []
+    links = []
     if reply_to := message.reply_to_message:
-        if (file_ := reply_to.document) and (file_.mime_type == "text/plain"):
-            links_list = await get_links_from_file(reply_to)
-        elif text := reply_to.text:
-            links_list = get_links_from_message(text)
-    return (
-        filter_links(links_list, bulk_start, bulk_end) if links_list else links_list
-    )
+        if (
+            reply_to.document
+            and reply_to.document.mime_type == "text/plain"
+        ):
+            file_ = await reply_to.download()
+            with open(file_, "r") as f:
+                lines = f.readlines()
+            links = [line.strip() for line in lines if line.strip()]
+            from os import remove
+            remove(file_)
+        elif reply_to.text:
+            links = get_links_from_message(reply_to.text)
+
+    if links:
+        return filter_links(links, bulk_start, bulk_end)
+    return []

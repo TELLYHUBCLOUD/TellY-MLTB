@@ -1,6 +1,6 @@
 """
-IMDB Integration Module for Auto Rename Feature
-Provides IMDB data fetching for movies and TV series
+IMDB and TMDB Integration Module for Auto Rename Feature
+Provides Metadata fetching for movies and TV series
 """
 
 from logging import getLogger
@@ -137,4 +137,59 @@ def get_poster(query):
         return None
     except Exception as e:
         LOGGER.error(f"Error fetching IMDB data for {query}: {e}")
+        return None
+
+def get_tmdb_result(query, api_key, thumb_format="poster"):
+    if not query or not api_key:
+        return None
+
+    try:
+        # Search
+        search_url = f"https://api.themoviedb.org/3/search/multi?api_key={api_key}&query={quote_plus(query)}"
+        response = requests.get(search_url, timeout=10)
+        if response.status_code != 200:
+            return None
+
+        data = response.json()
+        if not data.get("results"):
+            return None
+
+        result = data["results"][0]
+        media_type = result.get("media_type")
+        id_ = result.get("id")
+
+        # Get details
+        details_url = f"https://api.themoviedb.org/3/{media_type}/{id_}?api_key={api_key}"
+        response = requests.get(details_url, timeout=10)
+        if response.status_code != 200:
+            return None
+
+        details = response.json()
+
+        title = details.get("title") or details.get("name")
+        year = details.get("release_date") or details.get("first_air_date") or ""
+        year = year.split("-")[0] if year else ""
+        rating = details.get("vote_average", "")
+        genres = ", ".join([g["name"] for g in details.get("genres", [])])
+
+        poster_path = details.get("poster_path")
+        backdrop_path = details.get("backdrop_path")
+
+        image_url = ""
+        if thumb_format == "backdrop" and backdrop_path:
+            image_url = f"https://image.tmdb.org/t/p/original{backdrop_path}"
+        elif poster_path:
+            image_url = f"https://image.tmdb.org/t/p/original{poster_path}"
+        elif backdrop_path: # Fallback
+            image_url = f"https://image.tmdb.org/t/p/original{backdrop_path}"
+
+        return {
+            "title": title,
+            "year": year,
+            "rating": str(rating),
+            "genres": genres,
+            "poster": image_url
+        }
+    except Exception as e:
+        LOGGER.error(f"TMDB error: {e}")
         return None

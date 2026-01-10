@@ -1,244 +1,204 @@
 import contextlib
-from asyncio import create_subprocess_exec, gather, sleep, wait_for
+from asyncio import create_subprocess_exec, gather, wait_for
 from asyncio.subprocess import PIPE
 from os import path as ospath
 from re import escape
-from re import search as re_search
 from time import time
 
 from aiofiles.os import makedirs, remove
-from aiofiles.os import path as aiopath
 from aioshutil import rmtree
 from PIL import Image
 
-from bot import DOWNLOAD_DIR, LOGGER, cpu_no
+from bot import DOWNLOAD_DIR, LOGGER, cores, threads
 
 from .bot_utils import cmd_exec, sync_to_async
 from .files_utils import get_mime_type, is_archive, is_archive_split
-from .status_utils import time_to_seconds
 
 
-async def create_thumb(msg, _id=""):
-    if not _id:
-        _id = time()
-        path = f"{DOWNLOAD_DIR}thumbnails"
+async def create_thumb(msg, _=None):
+    if not msg:
+        return ""
+    file_handler = msg.photo or msg.document
+    if not file_handler:
+        return ""
+    if (
+        msg.document
+        and not msg.document.mime_type.startswith("image")
+        and not msg.document.mime_type.startswith("video")
+    ):
+        return ""
+    if msg.photo:
+        if not msg.photo.file_size:
+            return ""
+    elif msg.document:
+        if not msg.document.file_size:
+            return ""
+    des_dir = f"{DOWNLOAD_DIR}thumbnails/"
+    await makedirs(des_dir, exist_ok=True)
+    if msg.photo:
+        file_id = msg.photo.file_id
+        ext = ".jpg"
     else:
-        path = "thumbnails"
-    await makedirs(path, exist_ok=True)
-    photo_dir = await msg.download()
-    output = ospath.join(path, f"{_id}.jpg")
-    await sync_to_async(Image.open(photo_dir).convert("RGB").save, output, "JPEG")
-    await remove(photo_dir)
-    return output
+        file_id = msg.document.file_id
+        ext = ospath.splitext(msg.document.file_name)[1]
+    path = f"{des_dir}{time()}{ext}"
+    await msg.download(file_name=path)
+    return path
 
 
-async def get_media_info(path, enhanced=False):
-    """
-    Get media information from file using ffprobe
-
-    Args:
-        path (str): Path to media file
-        enhanced (bool): If True, returns (codec, quality, language, duration)
-                        If False, returns (duration, artist, title) - legacy mode
-
-    Returns:
-        tuple: Either (codec, quality, language, duration) or (duration, artist, title)
-    """
-    if enhanced:
-        # Enhanced mode for Auto Rename feature
-        try:
-            # Get streams info
-            result = await cmd_exec(
-                [
-                    "ffprobe",
-                    "-hide_banner",
-                    "-loglevel",
-                    "error",
-                    "-print_format",
-                    "json",
-                    "-show_streams",
-                    "-show_format",
-                    path,
-                ],
-            )
-        except Exception as e:
-            LOGGER.error(f"Get Media Info (Enhanced): {e}. File: {path}")
-            return None, None, None, 0
-
-        if result[0] and result[2] == 0:
-            try:
-                data = eval(result[0])
-                streams = data.get("streams", [])
-                format_info = data.get("format", {})
-
-                codec = None
-                quality = None
-                language = None
-                duration = 0
-
-                # Extract duration
-                try:
-                    duration = round(float(format_info.get("duration", 0)))
-                except:
-                    duration = 0
-
-                # Extract video codec and resolution
-                for stream in streams:
-                    if stream.get("codec_type") == "video":
-                        codec = stream.get("codec_name", "").upper()
-                        height = stream.get("height", 0)
-                        if height:
-                            quality = f"{height}p"
-                        break
-
-                # Extract audio language
-                audio_streams = [
-                    s for s in streams if s.get("codec_type") == "audio"
-                ]
-                if audio_streams:
-                    tags = audio_streams[0].get("tags", {})
-                    language = (
-                        tags.get("language")
-                        or tags.get("LANGUAGE")
-                        or tags.get("Language")
-                        or "eng"
-                    )
-
-                return codec, quality, language, duration
-
-            except Exception as e:
-                LOGGER.error(f"Error parsing enhanced media info: {e}")
-                return None, None, None, 0
-
-        return None, None, None, 0
-
-    # Legacy mode - original functionality
+async def is_multi_streams(path):
     try:
         result = await cmd_exec(
             [
                 "ffprobe",
                 "-hide_banner",
-                "-loglevel",
-                "error",
+                "-show_streams",
                 "-print_format",
                 "json",
-                "-show_format",
                 path,
-            ],
+            ]
         )
-    except Exception as e:
-        LOGGER.error(f"Get Media Info: {e}. Mostly File not found! - File: {path}")
-        return 0, None, None
-    if result[0] and result[2] == 0:
-        fields = eval(result[0]).get("format")
-        if fields is None:
-            LOGGER.error(f"get_media_info: {result}")
-            return 0, None, None
-        duration = round(float(fields.get("duration", 0)))
-        tags = fields.get("tags", {})
-        artist = tags.get("artist") or tags.get("ARTIST") or tags.get("Artist")
-        title = tags.get("title") or tags.get("TITLE") or tags.get("Title")
-        return duration, artist, title
-    return 0, None, None
+        if result[1] and result[2] != 0:
+            return False
+    except Exception:
+        return False
+    fields = eval(result[0]).get("streams")
+    if fields is None:
+        LOGGER.error(f"get_media_info: {result}")
+        return False
+    videos = 0
+    audios = 0
+    for stream in fields:
+        if stream.get("codec_type") == "video":
+            videos += 1
+        elif stream.get("codec_type") == "audio":
+            audios += 1
+    return videos > 1 or audios > 1
+
+
+async def get_media_info(path, return_all=False):
+    try:
+        result = await cmd_exec(
+            [
+                "ffprobe",
+                "-hide_banner",
+                "-show_streams",
+                "-print_format",
+                "json",
+                path,
+            ]
+        )
+        if result[1] and result[2] != 0:
+            return (0, "", "", "") if return_all else (0, None, None)
+    except Exception:
+        return (0, "", "", "") if return_all else (0, None, None)
+    fields = eval(result[0]).get("streams")
+    if fields is None:
+        LOGGER.error(f"get_media_info: {result}")
+        return (0, "", "", "") if return_all else (0, None, None)
+    duration = 0
+    lang = ""
+    quality = ""
+    artist = ""
+    title = ""
+    for stream in fields:
+        if stream.get("codec_type") == "video":
+            duration = int(float(stream.get("duration", 0)))
+            if not quality:
+                quality = stream.get("height")
+        elif stream.get("codec_type") == "audio":
+            if not lang:
+                lang = stream.get("tags", {}).get("language")
+            if not artist:
+                artist = stream.get("tags", {}).get("artist")
+            if not title:
+                title = stream.get("tags", {}).get("title")
+    if return_all:
+        return duration, quality, lang, title
+    return duration, artist, title
 
 
 async def get_document_type(path):
     is_video, is_audio, is_image = False, False, False
-    if (
-        is_archive(path)
-        or is_archive_split(path)
-        or re_search(r".+(\.|_)(rar|7z|zip|bin)(\.0*\d+)?$", path)
-    ):
+    if path.endswith(tuple(is_archive_split)):
         return is_video, is_audio, is_image
-    mime_type = await sync_to_async(get_mime_type, path)
+    mime_type = get_mime_type(path)
     if mime_type.startswith("image"):
-        return False, False, True
+        is_image = True
+        return is_video, is_audio, is_image
+    if mime_type.startswith("audio"):
+        is_audio = True
+        return is_video, is_audio, is_image
+    if not mime_type.startswith("video") and not mime_type.endswith("octet-stream"):
+        return is_video, is_audio, is_image
     try:
         result = await cmd_exec(
             [
                 "ffprobe",
                 "-hide_banner",
-                "-loglevel",
-                "error",
+                "-show_streams",
                 "-print_format",
                 "json",
-                "-show_streams",
                 path,
-            ],
+            ]
         )
-        if result[1] and mime_type.startswith("video"):
-            is_video = True
-    except Exception as e:
-        LOGGER.error(
-            f"Get Document Type: {e}. Mostly File not found! - File: {path}",
-        )
-        if mime_type.startswith("audio"):
-            return False, True, False
-        if not mime_type.startswith("video") and not mime_type.endswith(
-            "octet-stream",
-        ):
+        if result[1] and result[2] != 0:
             return is_video, is_audio, is_image
-        if mime_type.startswith("video"):
-            is_video = True
+    except Exception:
         return is_video, is_audio, is_image
-    if result[0] and result[2] == 0:
-        fields = eval(result[0]).get("streams")
-        if fields is None:
-            LOGGER.error(f"get_document_type: {result}")
-            return is_video, is_audio, is_image
-        is_video = False
-        for stream in fields:
-            if stream.get("codec_type") == "video":
-                codec_name = stream.get("codec_name", "").lower()
-                if codec_name not in {"mjpeg", "png", "bmp"}:
-                    is_video = True
-            elif stream.get("codec_type") == "audio":
-                is_audio = True
+    fields = eval(result[0]).get("streams")
+    if fields is None:
+        LOGGER.error(f"get_document_type: {result}")
+        return is_video, is_audio, is_image
+    for stream in fields:
+        if stream.get("codec_type") == "video":
+            is_video = True
+        elif stream.get("codec_type") == "audio":
+            is_audio = True
     return is_video, is_audio, is_image
 
 
 async def take_ss(video_file, ss_nb) -> bool:
     duration = (await get_media_info(video_file))[0]
     if duration != 0:
-        dirpath, name = video_file.rsplit("/", 1)
-        name, _ = ospath.splitext(name)
-        dirpath = f"{dirpath}/{name}_ss"
+        dirpath = ospath.join(ospath.dirname(video_file), f"{ospath.splitext(ospath.basename(video_file))[0]}_ss")
         await makedirs(dirpath, exist_ok=True)
         interval = duration // (ss_nb + 1)
         cap_time = interval
+        name = escape(ospath.basename(video_file))
         cmds = []
-        for i in range(ss_nb):
-            output = f"{dirpath}/SS.{name}_{i:02}.png"
-            cmd = [
-                "xtra",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-ss",
-                f"{cap_time}",
-                "-i",
-                video_file,
-                "-q:v",
-                "1",
-                "-frames:v",
-                "1",
-                "-threads",
-                f"{max(1, cpu_no // 2)}",
-                output,
-            ]
-            cap_time += interval
-            cmds.append(cmd_exec(cmd))
         try:
+            for i in range(ss_nb):
+                output = f"{dirpath}/SS.{name}_{i:02}.png"
+                cmd = [
+                    "xtra",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-ss",
+                    f"{cap_time}",
+                    "-i",
+                    video_file,
+                    "-vframes",
+                    "1",
+                    "-frames:v",
+                    "1",
+                    "-threads",
+                    f"{threads}",
+                    output,
+                ]
+                cap_time += interval
+                cmds.append(create_subprocess_exec(*cmd, stdout=PIPE, stderr=PIPE))
             resutls = await wait_for(gather(*cmds), timeout=60)
             if resutls[0][2] != 0:
                 LOGGER.error(
-                    f"Error while creating sreenshots from video. Path: {video_file}. stderr: {resutls[0][1]}",
+                    f"Error while creating screenshots from video. Path: {video_file}. stderr: {resutls[0][1]}",
                 )
                 await rmtree(dirpath, ignore_errors=True)
                 return False
         except Exception:
             LOGGER.error(
-                f"Error while creating sreenshots from video. Path: {video_file}. Error: Timeout some issues with ffmpeg with specific arch!",
+                f"Error while creating screenshots from video. Path: {video_file}. Error: Timeout some issues with ffmpeg with specific arch!",
             )
             await rmtree(dirpath, ignore_errors=True)
             return False
@@ -248,7 +208,7 @@ async def take_ss(video_file, ss_nb) -> bool:
 
 
 async def get_audio_thumbnail(audio_file):
-    output_dir = f"{DOWNLOAD_DIR}thumbnails"
+    output_dir = f"{DOWNLOAD_DIR}thumbnails/"
     await makedirs(output_dir, exist_ok=True)
     output = ospath.join(output_dir, f"{time()}.jpg")
     cmd = [
@@ -262,29 +222,22 @@ async def get_audio_thumbnail(audio_file):
         "-vcodec",
         "copy",
         "-threads",
-        f"{max(1, cpu_no // 2)}",
+        f"{threads}",
         output,
     ]
     try:
-        _, err, code = await wait_for(cmd_exec(cmd), timeout=60)
-        if code != 0 or not await aiopath.exists(output):
-            LOGGER.error(
-                f"Error while extracting thumbnail from audio. Name: {audio_file} stderr: {err}",
-            )
-            return None
-    except Exception:
-        LOGGER.error(
-            f"Error while extracting thumbnail from audio. Name: {audio_file}. Error: Timeout some issues with ffmpeg with specific arch!",
-        )
-        return None
-    return output
+        await cmd_exec(cmd)
+        if await sync_to_async(ospath.exists, output):
+            return output
+    except Exception as e:
+        LOGGER.error(f"get_audio_thumbnail: {e}")
+    return "none"
 
 
 async def get_video_thumbnail(video_file, duration):
-    output_dir = f"{DOWNLOAD_DIR}thumbnails"
+    output_dir = f"{DOWNLOAD_DIR}thumbnails/"
     await makedirs(output_dir, exist_ok=True)
     output = ospath.join(output_dir, f"{time()}.jpg")
-
     if duration is None:
         duration = (await get_media_info(video_file))[0]
     if duration == 0:
@@ -299,38 +252,25 @@ async def get_video_thumbnail(video_file, duration):
         f"{duration}",
         "-i",
         video_file,
-        "-vf",
-        "scale=640:-1",
-        "-q:v",
-        "5",
         "-vframes",
         "1",
-        "-threads",
+        "-frames:v",
         "1",
+        "-threads",
+        f"{threads}",
         output,
     ]
     try:
-        _, err, code = await wait_for(cmd_exec(cmd), timeout=60)
-        if code != 0 or not await aiopath.exists(output):
-            LOGGER.error(
-                f"Error while extracting thumbnail from video. Name: {video_file} stderr: {err}",
-            )
-            return None
-    except Exception:
-        LOGGER.error(
-            f"Error while extracting thumbnail from video. Name: {video_file}. Error: Timeout some issues with ffmpeg with specific arch!",
-        )
-        return None
-    return output
+        await cmd_exec(cmd)
+        if await sync_to_async(ospath.exists, output):
+            return output
+    except Exception as e:
+        LOGGER.error(f"get_video_thumbnail: {e}")
+    return "none"
 
 
 async def get_multiple_frames_thumbnail(video_file, layout, keep_screenshots):
-    ss_nb = layout.split("x")
-    ss_nb = int(ss_nb[0]) * int(ss_nb[1])
-    dirpath = await take_ss(video_file, ss_nb)
-    if not dirpath:
-        return None
-    output_dir = f"{DOWNLOAD_DIR}thumbnails"
+    output_dir = f"{DOWNLOAD_DIR}thumbnails/"
     await makedirs(output_dir, exist_ok=True)
     output = ospath.join(output_dir, f"{time()}.jpg")
     cmd = [
@@ -338,65 +278,41 @@ async def get_multiple_frames_thumbnail(video_file, layout, keep_screenshots):
         "-hide_banner",
         "-loglevel",
         "error",
-        "-pattern_type",
-        "glob",
         "-i",
-        f"{escape(dirpath)}/*.png",
+        video_file,
         "-vf",
-        f"tile={layout}, thumbnail",
-        "-q:v",
-        "1",
+        f"thumbnail,tile={layout}",
         "-frames:v",
         "1",
         "-f",
         "mjpeg",
         "-threads",
-        f"{max(1, cpu_no // 2)}",
+        f"{threads}",
         output,
     ]
     try:
-        _, err, code = await wait_for(cmd_exec(cmd), timeout=60)
-        if code != 0 or not await aiopath.exists(output):
-            LOGGER.error(
-                f"Error while combining thumbnails for video. Name: {video_file} stderr: {err}",
-            )
-            return None
-    except Exception:
-        LOGGER.error(
-            f"Error while combining thumbnails from video. Name: {video_file}. Error: Timeout some issues with ffmpeg with specific arch!",
-        )
-        return None
-    finally:
-        if not keep_screenshots:
-            await rmtree(dirpath, ignore_errors=True)
-    return output
-
-
-def is_mkv(file):
-    return file.lower().endswith(".mkv")
+        await cmd_exec(cmd)
+        if await sync_to_async(ospath.exists, output):
+            return output
+    except Exception as e:
+        LOGGER.error(f"get_multiple_frames_thumbnail: {e}")
+    return "none"
 
 
 class FFMpeg:
     def __init__(self, listener):
         self._listener = listener
-        self._processed_bytes = 0
-        self._last_processed_bytes = 0
-        self._processed_time = 0
-        self._last_processed_time = 0
-        self._speed_raw = 0
         self._progress_raw = 0
-        self._total_time = 0
         self._eta_raw = 0
-        self._time_rate = 0.1
-        self._start_time = 0
-
-    @property
-    def processed_bytes(self):
-        return self._processed_bytes
+        self._processed_bytes = 0
+        self._subsize = listener.subsize
 
     @property
     def speed_raw(self):
-        return self._speed_raw
+        try:
+            return self._processed_bytes / (time() - self._listener.start_time)
+        except ZeroDivisionError:
+            return 0
 
     @property
     def progress_raw(self):
@@ -406,147 +322,76 @@ class FFMpeg:
     def eta_raw(self):
         return self._eta_raw
 
+    @property
+    def processed_bytes(self):
+        return self._processed_bytes
+
     def clear(self):
-        self._start_time = time()
-        self._processed_bytes = 0
-        self._processed_time = 0
-        self._speed_raw = 0
         self._progress_raw = 0
         self._eta_raw = 0
-        self._time_rate = 0.1
-        self._last_processed_time = 0
-        self._last_processed_bytes = 0
+        self._processed_bytes = 0
 
     async def _ffmpeg_progress(self):
         while not (
             self._listener.subproc.returncode is not None
             or self._listener.is_cancelled
-            or self._listener.subproc.stdout.at_eof()
         ):
             try:
-                line = await wait_for(self._listener.subproc.stdout.readline(), 60)
+                line = await wait_for(self._listener.subproc.stdout.readline(), 5)
             except Exception:
                 break
-            line = line.decode().strip()
             if not line:
                 break
-            if "=" in line:
-                key, value = line.split("=", 1)
-                if value != "N/A":
-                    if key == "total_size":
-                        self._processed_bytes = (
-                            int(value) + self._last_processed_bytes
-                        )
-                        self._speed_raw = self._processed_bytes / (
-                            time() - self._start_time
-                        )
-                    elif key == "speed":
-                        self._time_rate = max(0.1, float(value.strip("x")))
-                    elif key == "out_time":
-                        self._processed_time = (
-                            time_to_seconds(value) + self._last_processed_time
-                        )
-                        try:
-                            self._progress_raw = (
-                                self._processed_time / self._total_time * 100
-                            )
-                            self._eta_raw = (
-                                self._total_time - self._processed_time
-                            ) / self._time_rate
-                        except Exception:
-                            self._progress_raw = 0
-                            self._eta_raw = 0
-            await sleep(0.05)
+            line = line.decode().strip()
+            if not self._listener.progress:
+                continue
+            progress = {}
+            if line.startswith("out_time_ms") and "N/A" not in line:
+                progress["time"] = int(line.split("=")[1]) / 1000000
+            elif line.startswith("total_size"):
+                progress["size"] = int(line.split("=")[1])
+            if "time" in progress:
+                self._processed_bytes = progress["size"]
+                self._progress_raw = (
+                    self._processed_bytes / self._subsize
+                ) * 100
+                try:
+                    self._eta_raw = (
+                        self._subsize - self._processed_bytes
+                    ) / self.speed_raw
+                except Exception:
+                    self._progress_raw = 0
+                    self._eta_raw = 0
 
     async def ffmpeg_cmds(self, ffmpeg, f_path):
         self.clear()
-        self._total_time = (await get_media_info(f_path))[0]
-        base_name, ext = ospath.splitext(f_path)
-        dir, base_name = base_name.rsplit("/", 1)
-        indices = [
-            index
-            for index, item in enumerate(ffmpeg)
-            if item.startswith("mltb") or item == "mltb"
-        ]
-        outputs = []
-        for index in indices:
-            output_file = ffmpeg[index]
-            if output_file != "mltb" and output_file.startswith("mltb"):
-                bo, oext = ospath.splitext(output_file)
-                if oext:
-                    if ext == oext:
-                        prefix = f"ffmpeg{index}." if bo == "mltb" else ""
-                    else:
-                        prefix = ""
-                    ext = ""
-                else:
-                    prefix = ""
-            else:
-                prefix = f"ffmpeg{index}."
-            output = f"{dir}/{prefix}{output_file.replace('mltb', base_name)}{ext}"
-            outputs.append(output)
-            ffmpeg[index] = output
-        if self._listener.is_cancelled:
-            return False
         self._listener.subproc = await create_subprocess_exec(
             *ffmpeg,
             stdout=PIPE,
             stderr=PIPE,
         )
         await self._ffmpeg_progress()
-        _, stderr = await self._listener.subproc.communicate()
-        code = self._listener.subproc.returncode
-        if self._listener.is_cancelled:
-            return False
-        if code == 0:
-            return outputs
-        if code == -9:
-            self._listener.is_cancelled = True
-            return False
-        try:
-            stderr = stderr.decode().strip()
-        except Exception:
-            stderr = "Unable to decode the error!"
-        LOGGER.error(
-            f"{stderr}. Something went wrong while running ffmpeg cmd, mostly file requires different/specific arguments. Path: {f_path}",
-        )
-        for op in outputs:
-            if await aiopath.exists(op):
-                await remove(op)
+        returncode = await self._listener.subproc.wait()
+        if returncode == 0:
+            return (
+                await listdir(ffmpeg[-1])
+                if await sync_to_async(ospath.isdir, ffmpeg[-1])
+                else [ffmpeg[-1]]
+            )
         return False
 
     async def metadata_watermark_cmds(self, ffmpeg, f_path):
         self.clear()
-        self._total_time = (await get_media_info(f_path))[0]
-        if self._listener.is_cancelled:
-            return False
         self._listener.subproc = await create_subprocess_exec(
             *ffmpeg,
             stdout=PIPE,
             stderr=PIPE,
         )
         await self._ffmpeg_progress()
-        _, stderr = await self._listener.subproc.communicate()
-        code = self._listener.subproc.returncode
-        if self._listener.is_cancelled:
-            return False
-        if code == 0:
-            return True
-        if code == -9:
-            self._listener.is_cancelled = True
-            return False
-        try:
-            stderr = stderr.decode().strip()
-        except Exception:
-            stderr = "Unable to decode the error!"
-        LOGGER.error(
-            f"{stderr}. Something went wrong while running ffmpeg cmd, mostly file requires different/specific arguments. Path: {f_path}",
-        )
-        return False
+        returncode = await self._listener.subproc.wait()
+        return returncode == 0
 
     async def convert_video(self, video_file, ext, retry=False):
-        self.clear()
-        self._total_time = (await get_media_info(video_file))[0]
         base_name = ospath.splitext(video_file)[0]
         output = f"{base_name}.{ext}"
         if retry:
@@ -566,15 +411,15 @@ class FFMpeg:
                 "-c:a",
                 "aac",
                 "-threads",
-                f"{max(1, cpu_no // 2)}",
+                f"{threads}",
                 output,
             ]
             if ext == "mp4":
-                cmd[14:14] = ["-c:s", "mov_text"]
+                cmd[17:17] = ["-c:s", "mov_text"]
             elif ext == "mkv":
-                cmd[14:14] = ["-c:s", "ass"]
+                cmd[17:17] = ["-c:s", "ass"]
             else:
-                cmd[14:14] = ["-c:s", "copy"]
+                cmd[17:17] = ["-c:s", "copy"]
         else:
             cmd = [
                 "xtra",
@@ -590,7 +435,7 @@ class FFMpeg:
                 "-c",
                 "copy",
                 "-threads",
-                f"{max(1, cpu_no // 2)}",
+                f"{threads}",
                 output,
             ]
         if self._listener.is_cancelled:
@@ -601,31 +446,14 @@ class FFMpeg:
             stderr=PIPE,
         )
         await self._ffmpeg_progress()
-        _, stderr = await self._listener.subproc.communicate()
-        code = self._listener.subproc.returncode
-        if self._listener.is_cancelled:
-            return False
-        if code == 0:
+        returncode = await self._listener.subproc.wait()
+        if returncode == 0:
             return output
-        if code == -9:
-            self._listener.is_cancelled = True
-            return False
-        if await aiopath.exists(output):
-            await remove(output)
         if not retry:
             return await self.convert_video(video_file, ext, True)
-        try:
-            stderr = stderr.decode().strip()
-        except Exception:
-            stderr = "Unable to decode the error!"
-        LOGGER.error(
-            f"{stderr}. Something went wrong while converting video, mostly file need specific codec. Path: {video_file}",
-        )
         return False
 
     async def convert_audio(self, audio_file, ext):
-        self.clear()
-        self._total_time = (await get_media_info(audio_file))[0]
         base_name = ospath.splitext(audio_file)[0]
         output = f"{base_name}.{ext}"
         cmd = [
@@ -638,7 +466,7 @@ class FFMpeg:
             "-i",
             audio_file,
             "-threads",
-            f"{max(1, cpu_no // 2)}",
+            f"{threads}",
             output,
         ]
         if self._listener.is_cancelled:
@@ -649,54 +477,30 @@ class FFMpeg:
             stderr=PIPE,
         )
         await self._ffmpeg_progress()
-        _, stderr = await self._listener.subproc.communicate()
-        code = self._listener.subproc.returncode
-        if self._listener.is_cancelled:
-            return False
-        if code == 0:
+        returncode = await self._listener.subproc.wait()
+        if returncode == 0:
             return output
-        if code == -9:
-            self._listener.is_cancelled = True
-            return False
-        try:
-            stderr = stderr.decode().strip()
-        except Exception:
-            stderr = "Unable to decode the error!"
-        LOGGER.error(
-            f"{stderr}. Something went wrong while converting audio, mostly file need specific codec. Path: {audio_file}",
-        )
-        if await aiopath.exists(output):
-            await remove(output)
         return False
 
     async def sample_video(self, video_file, sample_duration, part_duration):
-        self.clear()
-        self._total_time = sample_duration
-        dir, name = video_file.rsplit("/", 1)
-        output_file = f"{dir}/SAMPLE.{name}"
-        segments = [(0, part_duration)]
+        output_file = (
+            f"{ospath.splitext(video_file)[0]}_sample.{ospath.splitext(video_file)[1]}"
+        )
+        segments = []
         duration = (await get_media_info(video_file))[0]
-        remaining_duration = duration - (part_duration * 2)
-        parts = (sample_duration - (part_duration * 2)) // part_duration
-        time_interval = remaining_duration // parts
-        next_segment = time_interval
-        for _ in range(parts):
-            segments.append((next_segment, next_segment + part_duration))
-            next_segment += time_interval
-        segments.append((duration - part_duration, duration))
+        if duration == 0:
+            return False
+        total_parts = sample_duration // part_duration
+        interval = duration // (total_parts + 1)
 
         filter_complex = ""
-        for i, (start, end) in enumerate(segments):
-            filter_complex += (
-                f"[0:v]trim=start={start}:end={end},setpts=PTS-STARTPTS[v{i}]; "
-            )
-            filter_complex += (
-                f"[0:a]atrim=start={start}:end={end},asetpts=PTS-STARTPTS[a{i}]; "
-            )
-
-        for i in range(len(segments)):
+        for i in range(total_parts):
+            start_time = (i + 1) * interval
+            segments.append(f"[0:v]trim=start={start_time}:duration={part_duration},setpts=PTS-STARTPTS[v{i}];")
+            segments.append(f"[0:a]atrim=start={start_time}:duration={part_duration},asetpts=PTS-STARTPTS[a{i}];")
             filter_complex += f"[v{i}][a{i}]"
 
+        filter_complex = "".join(segments) + filter_complex
         filter_complex += f"concat=n={len(segments)}:v=1:a=1[vout][aout]"
 
         cmd = [
@@ -719,7 +523,7 @@ class FFMpeg:
             "-c:a",
             "aac",
             "-threads",
-            f"{max(1, cpu_no // 2)}",
+            f"{threads}",
             output_file,
         ]
 
@@ -731,34 +535,20 @@ class FFMpeg:
             stderr=PIPE,
         )
         await self._ffmpeg_progress()
-        _, stderr = await self._listener.subproc.communicate()
-        code = self._listener.subproc.returncode
-        if self._listener.is_cancelled:
-            return False
-        if code == -9:
-            self._listener.is_cancelled = True
-            return False
-        if code == 0:
+        returncode = await self._listener.subproc.wait()
+        if returncode == 0:
             return output_file
-        try:
-            stderr = stderr.decode().strip()
-        except Exception:
-            stderr = "Unable to decode the error!"
-        LOGGER.error(
-            f"{stderr}. Something went wrong while creating sample video, mostly file is corrupted. Path: {video_file}",
-        )
-        if await aiopath.exists(output_file):
-            await remove(output_file)
         return False
 
     async def split(self, f_path, file_, parts, split_size):
-        self.clear()
-        multi_streams = True
-        self._total_time = duration = (await get_media_info(f_path))[0]
-        base_name, extension = ospath.splitext(file_)
-        split_size -= 3000000
-        start_time = 0
+        duration = (await get_media_info(f_path))[0]
+        if duration == 0:
+            return False
+        multi_streams = await is_multi_streams(f_path)
         i = 1
+        start_time = 0
+        extension = ospath.splitext(file_)[1]
+        base_name = ospath.splitext(file_)[0]
         while i <= parts or start_time < duration - 4:
             out_path = f_path.replace(file_, f"{base_name}.part{i:03}{extension}")
             cmd = [
@@ -776,21 +566,17 @@ class FFMpeg:
                 str(split_size),
                 "-map",
                 "0",
-                "-map_chapters",
-                "-1",
-                "-async",
-                "1",
-                "-strict",
-                "-2",
+                "-map_metadata",
+                "0",
                 "-c",
                 "copy",
                 "-threads",
-                f"{max(1, cpu_no // 2)}",
+                f"{threads}",
                 out_path,
             ]
             if not multi_streams:
-                del cmd[12]
-                del cmd[12]
+                del cmd[15]
+                del cmd[15]
             if self._listener.is_cancelled:
                 return False
             self._listener.subproc = await create_subprocess_exec(
@@ -799,55 +585,23 @@ class FFMpeg:
                 stderr=PIPE,
             )
             await self._ffmpeg_progress()
-            _, stderr = await self._listener.subproc.communicate()
-            code = self._listener.subproc.returncode
-            if self._listener.is_cancelled:
-                return False
-            if code == -9:
+            returncode = await self._listener.subproc.wait()
+            if returncode == -9:
                 self._listener.is_cancelled = True
                 return False
-            if code != 0:
-                try:
-                    stderr = stderr.decode().strip()
-                except Exception:
-                    stderr = "Unable to decode the error!"
-                with contextlib.suppress(Exception):
-                    await remove(out_path)
-                if multi_streams:
-                    LOGGER.warning(
-                        f"{stderr}. Retrying without map, -map 0 not working in all situations. Path: {f_path}",
-                    )
-                    multi_streams = False
-                    continue
-                LOGGER.warning(
-                    f"{stderr}. Unable to split this video, if it's size less than {self._listener.max_split_size} will be uploaded as it is. Path: {f_path}",
-                )
+            if returncode != 0:
                 return False
-            out_size = await aiopath.getsize(out_path)
-            if out_size > self._listener.max_split_size:
-                split_size -= (out_size - self._listener.max_split_size) + 5000000
-                LOGGER.warning(
-                    f"Part size is {out_size}. Trying again with lower split size!. Path: {f_path}",
-                )
-                await remove(out_path)
-                continue
             lpd = (await get_media_info(out_path))[0]
             if lpd == 0:
-                LOGGER.error(
-                    f"Something went wrong while splitting, mostly file is corrupted. Path: {f_path}",
-                )
+                LOGGER.error(f"Something went wrong while splitting the file: {f_path}")
                 break
+            start_time += lpd - 3
+            i += 1
             if duration == lpd:
                 LOGGER.warning(
-                    f"This file has been splitted with default stream and audio, so you will only see one part with less size from orginal one because it doesn't have all streams and audios. This happens mostly with MKV videos. Path: {f_path}",
+                    f"This file has been splitted with default stream and audio, so you will only see one part with less size from original one because it doesn't have all streams and audios. This happens mostly with MKV videos. Path: {f_path}",
                 )
                 break
             if lpd <= 3:
-                await remove(out_path)
                 break
-            self._last_processed_time += lpd
-            self._last_processed_bytes += out_size
-            start_time += lpd - 3
-            i += 1
-
         return True

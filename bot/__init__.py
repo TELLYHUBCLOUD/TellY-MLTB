@@ -1,16 +1,4 @@
-# ruff: noqa: E402
-from uvloop import install
-
-install()
-
-import os
-import subprocess
-from asyncio import Lock, new_event_loop, set_event_loop
-from datetime import datetime
 from logging import (
-    ERROR,
-    INFO,
-    WARNING,
     FileHandler,
     Formatter,
     LogRecord,
@@ -18,66 +6,52 @@ from logging import (
     basicConfig,
     getLogger,
 )
-from time import time
+from os import makedirs, path, cpu_count
+from socket import gethostname
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from pytz import timezone
+from dotenv import load_dotenv
 from uvloop import install
 
-from sabnzbdapi import SabnzbdClient
+install()
 
-getLogger("requests").setLevel(WARNING)
-getLogger("urllib3").setLevel(WARNING)
-getLogger("pyrogram").setLevel(ERROR)
-getLogger("httpx").setLevel(WARNING)
-getLogger("pymongo").setLevel(WARNING)
-getLogger("aiohttp").setLevel(WARNING)
+# Setup logging
+makedirs("log", exist_ok=True)
+load_dotenv("config.env", override=True)
 
-bot_start_time = time()
-
-bot_loop = new_event_loop()
-set_event_loop(bot_loop)
+if path.exists("log.txt"):
+    with open("log.txt", "w+") as f:
+        f.truncate(0)
 
 
 class CustomFormatter(Formatter):
-    def formatTime(
-        self,
-        record: LogRecord,
-        datefmt: str | None,
-    ) -> str:
-        dt: datetime = datetime.fromtimestamp(
-            record.created,
-            tz=timezone("Asia/Dhaka"),
-        )
-        return dt.strftime(datefmt)
-
     def format(self, record: LogRecord) -> str:
-        return super().format(record).replace(record.levelname, record.levelname[:1])
+        return super().format(record).replace(gethostname(), "Aeon")
 
 
-formatter = CustomFormatter(
-    "[%(asctime)s] %(levelname)s - %(message)s [%(module)s:%(lineno)d]",
-    datefmt="%d-%b %I:%M:%S %p",
+basicConfig(
+    format="[%(asctime)s] - [%(name)s] - [%(levelname)s] - %(message)s",
+    datefmt="%d-%b-%y %I:%M:%S %p",
+    handlers=[
+        FileHandler("log.txt"),
+        StreamHandler(),
+    ],
+    level="INFO",
 )
 
-file_handler = FileHandler("log.txt")
-file_handler.setFormatter(formatter)
-
-stream_handler = StreamHandler()
-stream_handler.setFormatter(formatter)
-
-basicConfig(handlers=[file_handler, stream_handler], level=INFO)
+for handler in getLogger().handlers:
+    handler.setFormatter(CustomFormatter(handler.formatter._fmt, handler.formatter.datefmt))
 
 LOGGER = getLogger(__name__)
 
-cpu_no = os.cpu_count()
+cpu_no = cpu_count()
+threads = max(1, cpu_no // 2) # Dynamic threads
+cores = "" # Not used directly if we remove taskset, or generate dynamically if needed
 
-DOWNLOAD_DIR = "/usr/src/app/downloads/"
+DOWNLOAD_DIR = "/app/downloads/"
 intervals = {
     "status": {},
     "qb": "",
     "jd": "",
-    "nzb": "",
     "stopAll": False,
 }
 qb_torrents = {}
@@ -87,52 +61,24 @@ qbit_options = {}
 nzb_options = {}
 queued_dl = {}
 queued_up = {}
-status_dict = {}
-task_dict = {}
-jd_downloads = {}
-nzb_jobs = {}
-rss_dict = {}
-auth_chats = {}
-excluded_extensions = ["aria2", "!qB"]
-drives_names = []
-drives_ids = []
-index_urls = []
-sudo_users = []
 non_queued_dl = set()
 non_queued_up = set()
 multi_tags = set()
-task_dict_lock = Lock()
-queue_dict_lock = Lock()
-qb_listener_lock = Lock()
-cpu_eater_lock = Lock()
-same_directory_lock = Lock()
-nzb_listener_lock = Lock()
-jd_listener_lock = Lock()
+task_dict_lock = None
+queue_dict_lock = None
+qb_listener_lock = None
+jd_listener_lock = None
+nzb_listener_lock = None
+cpu_eater_lock = None
+subprocess_lock = None
+same_directory_lock = None
+bot_start_time = 0
+bot_loop = None
+rss_dict = {}
+auth_chats = {}
+excluded_extensions = ["aria2", "!qB"]
+included_extensions = []
+drives_names = []
+drives_ids = []
+index_urls = []
 shorteners_list = []
-
-sabnzbd_client = SabnzbdClient(
-    host="http://localhost",
-    api_key="mltb",
-    port="8070",
-)
-subprocess.run(["xnox", "-d", f"--profile={os.getcwd()}"], check=False)
-subprocess.run(
-    [
-        "xnzb",
-        "-f",
-        "sabnzbd/SABnzbd.ini",
-        "-s",
-        ":::8070",
-        "-b",
-        "0",
-        "-d",
-        "-c",
-        "-l",
-        "0",
-        "--console",
-    ],
-    check=False,
-)
-
-
-scheduler = AsyncIOScheduler(event_loop=bot_loop)

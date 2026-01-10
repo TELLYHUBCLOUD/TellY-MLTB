@@ -1,6 +1,4 @@
-from asyncio import gather
-
-from bot import LOGGER, nzb_jobs, nzb_listener_lock, sabnzbd_client
+from bot import sabnzbd_client
 from bot.helper.ext_utils.status_utils import (
     MirrorStatus,
     get_readable_file_size,
@@ -10,45 +8,18 @@ from bot.helper.ext_utils.status_utils import (
 
 
 async def get_download(nzo_id, old_info=None):
+    if old_info is None:
+        old_info = {}
     try:
         queue = await sabnzbd_client.get_downloads(nzo_ids=nzo_id)
         if res := queue["queue"]["slots"]:
-            slot = res[0]
-            if msg := slot["labels"]:
-                LOGGER.warning(" | ".join(msg))
-            return slot
+            return res[0]
         history = await sabnzbd_client.get_history(nzo_ids=nzo_id)
         if res := history["history"]["slots"]:
-            slot = res[0]
-            if slot["status"] == "Verifying":
-                percentage = slot["action_line"].split("Verifying: ")[-1].split("/")
-                percentage = round(
-                    (int(float(percentage[0])) / int(float(percentage[1]))) * 100, 2
-                )
-                old_info["percentage"] = percentage
-            elif slot["status"] == "Repairing":
-                action = slot["action_line"].split("Repairing: ")[-1].split()
-                percentage = action[0].strip("%")
-                eta = action[2]
-                old_info["percentage"] = percentage
-                old_info["timeleft"] = eta
-            elif slot["status"] == "Extracting":
-                if "Unpacking" in slot["action_line"]:
-                    action = slot["action_line"].split("Unpacking: ")[-1].split()
-                else:
-                    action = slot["action_line"].split("Direct Unpack: ")[-1].split()
-                percentage = action[0].split("/")
-                percentage = round(
-                    (int(float(percentage[0])) / int(float(percentage[1]))) * 100, 2
-                )
-                eta = action[2]
-                old_info["percentage"] = percentage
-                old_info["timeleft"] = eta
-            old_info["status"] = slot["status"]
-        return old_info
-    except Exception as e:
-        LOGGER.error(f"{e}: Sabnzbd, while getting job info. ID: {nzo_id}")
-        return old_info
+            return res[0]
+    except Exception:
+        pass
+    return old_info
 
 
 class SabnzbdStatus:
@@ -56,26 +27,30 @@ class SabnzbdStatus:
         self.queued = queued
         self.listener = listener
         self._gid = gid
-        self._info = None
+        self._info = {}
         self.tool = "sabnzbd"
 
     async def update(self):
         self._info = await get_download(self._gid, self._info)
 
     def progress(self):
-        return f"{self._info['percentage']}%"
+        return f"{self._info.get('percentage', '0')}%"
 
     def processed_raw(self):
-        return (float(self._info["mb"]) - float(self._info["mbleft"])) * 1048576
+        return (
+            float(self._info.get("mb", "0")) - float(self._info.get("mbleft", "0"))
+        ) * 1048576
 
     def processed_bytes(self):
         return get_readable_file_size(self.processed_raw())
 
     def speed_raw(self):
-        if self._info["mb"] == self._info["mbleft"]:
+        if self._info.get("mb", "0") == self._info.get("mbleft", "0"):
             return 0
         try:
-            return int(float(self._info["mbleft"]) * 1048576) / self.eta_raw()
+            return (
+                int(float(self._info.get("mbleft", "0")) * 1048576) / self.eta_raw()
+            )
         except Exception:
             return 0
 
@@ -83,22 +58,22 @@ class SabnzbdStatus:
         return f"{get_readable_file_size(self.speed_raw())}/s"
 
     def name(self):
-        return self._info["filename"]
+        return self._info.get("filename", "")
 
     def size(self):
-        return self._info["size"]
+        return self._info.get("size", 0)
 
     def eta_raw(self):
-        return int(time_to_seconds(self._info["timeleft"]))
+        return int(time_to_seconds(self._info.get("timeleft", "0")))
 
     def eta(self):
         return get_readable_time(self.eta_raw())
 
     async def status(self):
         await self.update()
-        if self._info["mb"] == self._info["mbleft"]:
+        if self._info.get("mb", "0") == self._info.get("mbleft", "0"):
             return MirrorStatus.STATUS_QUEUEDL
-        state = self._info["status"]
+        state = self._info.get("status")
         if state == "Paused" and self.queued:
             return MirrorStatus.STATUS_QUEUEDL
         if state in [
@@ -109,25 +84,12 @@ class SabnzbdStatus:
             "Moving",
             "Extracting",
         ]:
-            return state
+            return MirrorStatus.STATUS_DOWNLOAD
         return MirrorStatus.STATUS_DOWNLOAD
 
     def task(self):
         return self
 
-    def gid(self):
-        return self._gid
-
     async def cancel_task(self):
         self.listener.is_cancelled = True
-        await self.update()
-        LOGGER.info(f"Cancelling Download: {self.name()}")
-        await gather(
-            self.listener.on_download_error("Stopped by user!"),
-            sabnzbd_client.delete_job(self._gid, delete_files=True),
-            sabnzbd_client.delete_category(f"{self.listener.mid}"),
-            sabnzbd_client.delete_history(self._gid, delete_files=True),
-        )
-        async with nzb_listener_lock:
-            if self._gid in nzb_jobs:
-                del nzb_jobs[self._gid]
+        await sabnzbd_client.delete_job(self._gid, delete_files=True)

@@ -7,10 +7,10 @@ from re import match as re_match
 from re import sub as re_sub
 from time import time
 
+from aiofiles import open as aiopen
 from aiofiles.os import (
     path as aiopath,
-)
-from aiofiles.os import (
+    makedirs,
     remove,
     rename,
 )
@@ -31,8 +31,9 @@ from tenacity import (
     wait_exponential,
 )
 
-from bot.core.aeon_client import TgClient
+from bot import intervals
 from bot.core.config_manager import Config
+from bot.core.telegram_manager import TgClient
 from bot.helper.aeon_utils.caption_gen import generate_caption
 from bot.helper.ext_utils.bot_utils import sync_to_async
 from bot.helper.ext_utils.files_utils import (
@@ -67,7 +68,7 @@ class TelegramUploader:
         self._media_dict = {"videos": {}, "documents": {}}
         self._last_msg_in_group = False
         self._up_path = ""
-        self._lprefix = ""
+        self._nprefix = ""
         self._lsuffix = ""
         self._user_dump = ""
         self._lcaption = ""
@@ -77,6 +78,7 @@ class TelegramUploader:
         self.log_msg = None
         self._user_session = self._listener.user_transmission
         self._error = ""
+        self._current_thumb = None
 
     async def _upload_progress(self, current, _):
         if self._listener.is_cancelled:
@@ -94,9 +96,9 @@ class TelegramUploader:
             if "MEDIA_GROUP" not in self._listener.user_dict
             else False
         )
-        self._lprefix = self._listener.user_dict.get("LEECH_FILENAME_PREFIX") or (
-            Config.LEECH_FILENAME_PREFIX
-            if "LEECH_FILENAME_PREFIX" not in self._listener.user_dict
+        self._nprefix = self._listener.user_dict.get("NAME_PREFIX") or (
+            Config.NAME_PREFIX
+            if "NAME_PREFIX" not in self._listener.user_dict
             else ""
         )
         self._lsuffix = self._listener.user_dict.get("LEECH_FILENAME_SUFFIX") or (
@@ -121,7 +123,6 @@ class TelegramUploader:
                     self._sent_msg = await TgClient.user.send_message(
                         chat_id=self._listener.up_dest,
                         text=msg,
-                        disable_web_page_preview=True,
                         message_thread_id=self._listener.chat_thread_id,
                         disable_notification=True,
                     )
@@ -129,7 +130,6 @@ class TelegramUploader:
                     self._sent_msg = await self._listener.client.send_message(
                         chat_id=self._listener.up_dest,
                         text=msg,
-                        disable_web_page_preview=True,
                         message_thread_id=self._listener.chat_thread_id,
                         disable_notification=True,
                     )
@@ -147,7 +147,6 @@ class TelegramUploader:
                 self._sent_msg = await TgClient.user.send_message(
                     chat_id=self._listener.message.chat.id,
                     text="Deleted Cmd Message! Don't delete the cmd message again!",
-                    disable_web_page_preview=True,
                     disable_notification=True,
                 )
         else:
@@ -205,19 +204,32 @@ class TelegramUploader:
 
                 probable_title = clean_filename_for_title(pre_file_)
 
-                # Fetch IMDB info
-                from bot.modules.imdb import get_poster
+                # Fetch Metadata (TMDB/IMDB)
+                from bot.modules.imdb import get_poster, get_tmdb_result
 
-                imdb_info = None
+                metadata_info = None
+                tmdb_key = user_dict.get("TMDB_API_KEY") or (Config.TMDB_API_KEY if hasattr(Config, 'TMDB_API_KEY') else "")
+                tmdb_enabled = user_dict.get("TMDB_ENABLED", Config.TMDB_ENABLED if hasattr(Config, 'TMDB_ENABLED') else True)
+                imdb_enabled = user_dict.get("IMDB_ENABLED", Config.IMDB_ENABLED if hasattr(Config, 'IMDB_ENABLED') else True)
+                thumb_format = user_dict.get("AUTO_THUMBNAIL_FORMAT", "poster")
+                auto_thumb = user_dict.get("AUTO_THUMBNAIL_ENABLED", Config.AUTO_THUMBNAIL_ENABLED if hasattr(Config, 'AUTO_THUMBNAIL_ENABLED') else False)
+
                 if probable_title:
-                    imdb_info = get_poster(probable_title)
-                if imdb_info:
+                    if tmdb_enabled and tmdb_key:
+                        metadata_info = get_tmdb_result(probable_title, tmdb_key, thumb_format)
+
+                    if not metadata_info and imdb_enabled:
+                        metadata_info = get_poster(probable_title)
+
+                if metadata_info:
                     imdb_data = {
-                        "title": imdb_info.get("title", ""),
-                        "year": imdb_info.get("year", ""),
-                        "rating": imdb_info.get("rating", "").replace(" / 10", ""),
-                        "genre": imdb_info.get("genres", ""),
+                        "title": metadata_info.get("title", ""),
+                        "year": metadata_info.get("year", ""),
+                        "rating": metadata_info.get("rating", "").replace(" / 10", ""),
+                        "genre": metadata_info.get("genres", ""),
                     }
+                    if auto_thumb and metadata_info.get("poster"):
+                        self._current_thumb = metadata_info["poster"]
                 else:
                     imdb_data = {
                         "title": probable_title,
@@ -416,44 +428,21 @@ class TelegramUploader:
                 self._lcaption,
                 media_info=media_info if auto_rename else None,
             )
-        if self._lprefix or self._lsuffix:
-            if not self._lcaption:
-                fname = f"{self._lprefix} {file_}" if self._lprefix else file_
-                if self._lsuffix:
-                    base_name = ospath.splitext(fname)[0]
-                    ext = ospath.splitext(fname)[1]
-                    fname = f"{base_name} {self._lsuffix}{ext}"
-                cap_mono = fname
+        if not self._lcaption:
+            cap_mono = f"<code>{file_}</code>"
 
-            if self._lprefix:
-                self._lprefix = re_sub("<.*?>", "", self._lprefix)
-            if self._lsuffix:
-                self._lsuffix = re_sub("<.*?>", "", self._lsuffix)
-
+        # Apply Suffix if available (Name prefix is handled in common.py/task_listener)
+        if self._lsuffix:
             base_name = ospath.splitext(file_)[0]
             ext = ospath.splitext(file_)[1]
-
-            new_name = file_
-            if self._lprefix:
-                new_name = f"{self._lprefix} {new_name}"
-            if self._lsuffix:
-                base_name = ospath.splitext(new_name)[0]
-                ext = ospath.splitext(new_name)[1]
-                new_name = f"{base_name} {self._lsuffix}{ext}"
-
+            new_name = f"{base_name} {self._lsuffix}{ext}"
             new_path = ospath.join(dirpath, new_name)
-            LOGGER.info(self._up_path)
             await rename(self._up_path, new_path)
             self._up_path = new_path
-            LOGGER.info(self._up_path)
-        elif auto_rename and file_ != pre_file_:
-            # Rename file on disk if auto rename was applied and no prefix
-            new_path = ospath.join(dirpath, file_)
-            await rename(self._up_path, new_path)
-            self._up_path = new_path
+            file_ = new_name
+            if not self._lcaption:
+                cap_mono = f"<code>{file_}</code>"
 
-        if not self._lcaption and not self._lprefix and not self._lsuffix:
-            cap_mono = f"<code>{file_}</code>"
         if len(file_) > 60:
             if is_archive(file_):
                 name = get_base_name(file_)
@@ -552,6 +541,8 @@ class TelegramUploader:
                 self._error = ""
                 self._up_path = f_path = ospath.join(dirpath, file_)
                 if not await aiopath.exists(self._up_path):
+                    if intervals["stopAll"]:
+                        return
                     LOGGER.error(f"{self._up_path} not exists! Continue uploading!")
                     continue
                 try:
@@ -604,7 +595,28 @@ class TelegramUploader:
                             )
                     self._last_msg_in_group = False
                     self._last_uploaded = 0
-                    await self._upload_file(cap_mono, file_, f_path)
+
+                    current_thumb = None
+                    if self._current_thumb:
+                        if self._thumb and self._thumb != "none" and await aiopath.exists(self._thumb):
+                             pass
+                        else:
+                            try:
+                                import requests
+                                from bot.helper.ext_utils.bot_utils import sync_to_async
+
+                                thumb_path = f"thumbnails/{self._user_id}_{time()}.jpg"
+                                await makedirs("thumbnails", exist_ok=True)
+
+                                req = await sync_to_async(requests.get, self._current_thumb)
+                                if req.status_code == 200:
+                                    async with aiopen(thumb_path, "wb") as f:
+                                        await f.write(req.content)
+                                    current_thumb = thumb_path
+                            except Exception as e:
+                                LOGGER.error(f"Failed to download auto thumbnail: {e}")
+
+                    await self._upload_file(cap_mono, file_, f_path, current_thumb=current_thumb)
                     if self._listener.is_cancelled:
                         return
                     if (
@@ -642,7 +654,7 @@ class TelegramUploader:
             return
         if self._total_files == 0:
             await self._listener.on_upload_error(
-                "No files to upload. In case you have filled EXCLUDED_EXTENSIONS, then check if all files have those extensions or not.",
+                "No files to upload. In case you have filled EXCLUDED/INCLUDED EXTENSIONS, then check if all files have those extensions or not.",
             )
             return
         if self._total_files <= self._corrupted:
@@ -664,14 +676,14 @@ class TelegramUploader:
         stop=stop_after_attempt(3),
         retry=retry_if_exception_type(Exception),
     )
-    async def _upload_file(self, cap_mono, file, o_path, force_document=False):
+    async def _upload_file(self, cap_mono, file, o_path, force_document=False, current_thumb=None):
+        thumb = current_thumb or self._thumb
         if (
-            self._thumb is not None
-            and not await aiopath.exists(self._thumb)
-            and self._thumb != "none"
+            thumb is not None
+            and not await aiopath.exists(thumb)
+            and thumb != "none"
         ):
-            self._thumb = None
-        thumb = self._thumb
+            thumb = None
         self._is_corrupted = False
         try:
             is_video, is_audio, is_image = await get_document_type(self._up_path)
@@ -681,6 +693,8 @@ class TelegramUploader:
                 thumb_path = f"{self._path}/yt-dlp-thumb/{file_name}.jpg"
                 if await aiopath.isfile(thumb_path):
                     thumb = thumb_path
+                elif await aiopath.isfile(thumb_path.replace("/yt-dlp-thumb", "")):
+                    thumb = thumb_path.replace("/yt-dlp-thumb", "")
                 elif is_audio and not is_video:
                     thumb = await get_audio_thumbnail(self._up_path)
 
@@ -792,7 +806,7 @@ class TelegramUploader:
                         self._last_msg_in_group = True
 
             if (
-                self._thumb is None
+                (self._thumb is None or thumb != self._thumb)
                 and thumb is not None
                 and await aiopath.exists(thumb)
             ):
@@ -801,15 +815,15 @@ class TelegramUploader:
             LOGGER.warning(str(f))
             await sleep(f.value * 1.3)
             if (
-                self._thumb is None
+                (self._thumb is None or thumb != self._thumb)
                 and thumb is not None
                 and await aiopath.exists(thumb)
             ):
                 await remove(thumb)
-            return await self._upload_file(cap_mono, file, o_path)
+            return await self._upload_file(cap_mono, file, o_path, force_document=force_document, current_thumb=current_thumb)
         except Exception as err:
             if (
-                self._thumb is None
+                (self._thumb is None or thumb != self._thumb)
                 and thumb is not None
                 and await aiopath.exists(thumb)
             ):

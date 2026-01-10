@@ -1,4 +1,4 @@
-from bot.core.aeon_client import TgClient
+from bot.core.telegram_manager import TgClient
 from bot.helper.telegram_helper.bot_commands import BotCommands
 
 nsfw_keywords = [
@@ -277,7 +277,7 @@ Notes:
 Examples: ["-i mltb.mkv -c copy -c:s srt mltb.mkv", "-i mltb.video -c copy -c:s srt mltb", "-i mltb.m4a -c:a libmp3lame -q:a 2 mltb.mp3", "-i mltb.audio -c:a libmp3lame -q:a 2 mltb.mp3", "-i mltb -map 0:a -c copy mltb.mka -map 0:s -c copy mltb.srt", "-i mltb -i tg://openmessage?user_id=5272663208&message_id=322801 -filter_complex 'overlay=W-w-10:H-h-10' -c:a copy mltb"]
 Here I will explain how to use mltb.* which is reference to files you want to work on.
 1. First cmd: the input is mltb.mkv so this cmd will work only on mkv videos and the output is mltb.mkv also so all outputs is mkv. -del will delete the original media after complete run of the cmd.
-2. Second cmd: the input is mltb.video so this cmd will work on all videos and the output is only mltb so the extenstion is same as input files.
+2. Second cmd: the input is mltb.video so this cmd will work on all videos and the output is only mltb so the extension is same as input files.
 3. Third cmd: the input in mltb.m4a so this cmd will work only on m4a audios and the output is mltb.mp3 so the output extension is mp3.
 4. Fourth cmd: the input is mltb.audio so this cmd will work on all audios and the output is mltb.mp3 so the output extension is mp3.
 5. Fifth cmd: You can add telegram link for small size input like photo to set watermark"""
@@ -405,7 +405,7 @@ user_settings_text = {
 3. <code>🎥 {filename}\n🔊 Audio: {languages}\n📝 Subs: {subtitles}</code>
 4. <code>{name} S{season}E{episode} [{quality} {audio}]\n💾 {filesize} | ⏱ {duration}</code>""",
     "LEECH_SPLIT_SIZE": f"Send Leech split size in bytes or use gb or mb. Example: 40000000 or 2.5gb or 1000mb. IS_PREMIUM_USER: {TgClient.IS_PREMIUM_USER}. Timeout: 60 sec",
-    "LEECH_FILENAME_PREFIX": r"Send Leech Filename Prefix. You can add HTML tags. Example: <code>@mychannel</code>. Timeout: 60 sec",
+    "NAME_PREFIX": r"Send Filename Prefix. Example: @mychannel. Timeout: 60 sec",
     "LEECH_FILENAME_SUFFIX": r"Send Leech Filename Suffix. You can add HTML tags. Example: <code>@mychannel</code>. Timeout: 60 sec",
     "THUMBNAIL_LAYOUT": "Send thumbnail layout (widthxheight, 2x2, 3x3, 2x4, 4x4, ...). Example: 3x3. Timeout: 60 sec",
     "RCLONE_PATH": "Send Rclone Path. If you want to use your rclone config edit using owner/user config from usetting or add mrcc: before rclone path. Example mrcc:remote:folder. Timeout: 60 sec",
@@ -413,7 +413,8 @@ user_settings_text = {
     "GDRIVE_ID": "Send Gdrive ID. If you want to use your token.pickle edit using owner/user token from usetting or add mtp: before the id. Example: mtp:F435RGGRDXXXXXX . Timeout: 60 sec",
     "INDEX_URL": "Send Index URL. Timeout: 60 sec",
     "UPLOAD_PATHS": "Send Dict of keys that have path values. Example: {'path 1': 'remote:rclonefolder', 'path 2': 'gdrive1 id', 'path 3': 'tg chat id', 'path 4': 'mrcc:remote:', 'path 5': b:@username} . Timeout: 60 sec",
-    "EXCLUDED_EXTENSIONS": "Send exluded extenions separated by space without dot at beginning. Timeout: 60 sec",
+    "EXCLUDED_EXTENSIONS": "Send excluded extensions separated by space without dot at beginning. Timeout: 60 sec",
+    "INCLUDED_EXTENSIONS": "Send included extensions separated by space without dot at beginning. Timeout: 60 sec",
     "NAME_SUBSTITUTE": r"""Word Subtitions. You can add pattern instead of normal text. Timeout: 60 sec
 NOTE: You must add \ before any character, those are the characters: \^$.|?*+()[]{}-
 Example: script/code/s | mirror/leech | tea/ /s | clone | cpu/ | \[mltb\]/mltb | \\text\\/text/s

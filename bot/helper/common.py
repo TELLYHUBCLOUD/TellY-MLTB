@@ -17,16 +17,18 @@ from pyrogram.enums import ChatAction
 from bot import (
     DOWNLOAD_DIR,
     LOGGER,
+    cores,
     cpu_eater_lock,
     excluded_extensions,
+    included_extensions,
     intervals,
     multi_tags,
     task_dict,
     task_dict_lock,
     user_data,
 )
-from bot.core.aeon_client import TgClient
 from bot.core.config_manager import Config
+from bot.core.telegram_manager import TgClient
 from bot.helper.aeon_utils.command_gen import (
     get_embed_thumb_cmd,
     get_metadata_cmd,
@@ -88,6 +90,7 @@ class TaskConfig:
         self.name = ""
         self.subname = ""
         self.name_sub = ""
+        self.name_prefix = ""
         self.metadata = ""
         self.watermark = ""
         self.thumbnail_layout = ""
@@ -110,8 +113,6 @@ class TaskConfig:
         self.compress = False
         self.select = False
         self.seed = False
-        self.compress = False
-        self.extract = False
         self.join = False
         self.private_link = False
         self.stop_duplicate = False
@@ -129,12 +130,73 @@ class TaskConfig:
         self.is_file = False
         self.bot_trans = False
         self.user_trans = False
+        self.is_rss = False
         self.progress = True
         self.ffmpeg_cmds = None
         self.chat_thread_id = None
         self.subproc = None
         self.thumb = None
+        self.media_tools = False
+        self.merge_video = False
+        self.merge_audio = False
+        self.merge_subtitle = False
+        self.merge_all = False
+        self.merge_image = False
+        self.merge_pdf = False
+        self.trim = ""
+        self.compression_enabled = False
+        self.extract_enabled = False
+        self.remove_enabled = False
+        self.swap_enabled = False
+        self.swap_audio_enabled = False
+        self.swap_video_enabled = False
+        self.swap_subtitle_enabled = False
+        self.compress_video = False
+        self.compress_audio = False
+        self.compress_image = False
+        self.compress_document = False
+        self.compress_subtitle = False
+        self.compress_archive = False
+        self.video_preset = None
+        self.audio_preset = None
+        self.image_preset = None
+        self.document_preset = None
+        self.subtitle_preset = None
+        self.archive_preset = None
+        self.remove_video_enabled = False
+        self.remove_audio_enabled = False
+        self.remove_subtitle_enabled = False
+        self.remove_attachment_enabled = False
+        self.remove_metadata = False
+        self.remove_video_index = ""
+        self.remove_audio_index = ""
+        self.remove_subtitle_index = ""
+        self.remove_attachment_index = ""
+        self.add_enabled = False
+        self.add_video_enabled = False
+        self.add_audio_enabled = False
+        self.add_subtitle_enabled = False
+        self.add_attachment_enabled = False
+        self.preserve_flag = False
+        self.replace_flag = False
+        self.metadata_title = ""
+        self.metadata_author = ""
+        self.metadata_comment = ""
+        self.metadata_all = ""
+        self.metadata_video_title = ""
+        self.metadata_video_author = ""
+        self.metadata_video_comment = ""
+        self.metadata_audio_title = ""
+        self.metadata_audio_author = ""
+        self.metadata_audio_comment = ""
+        self.metadata_subtitle_title = ""
+        self.metadata_subtitle_author = ""
+        self.metadata_subtitle_comment = ""
+        self.watermark_text = ""
+        self.watermark_image = ""
+        self.e_thumb = ""
         self.excluded_extensions = []
+        self.included_extensions = []
         self.files_to_proceed = []
         self.is_super_chat = self.message.chat.type.name in ["SUPERGROUP", "CHANNEL"]
 
@@ -197,6 +259,11 @@ class TaskConfig:
                 else ""
             )
         )
+        self.name_prefix = (
+            self.name_prefix
+            or self.user_dict.get("NAME_PREFIX", False)
+            or (Config.NAME_PREFIX if "NAME_PREFIX" not in self.user_dict else "")
+        )
         self.metadata = (
             self.metadata
             or self.user_dict.get("METADATA_KEY", False)
@@ -215,6 +282,11 @@ class TaskConfig:
             excluded_extensions
             if "EXCLUDED_EXTENSIONS" not in self.user_dict
             else ["aria2", "!qB"]
+        )
+        self.included_extensions = self.user_dict.get("INCLUDED_EXTENSIONS") or (
+            included_extensions
+            if "INCLUDED_EXTENSIONS" not in self.user_dict
+            else []
         )
         if not self.rc_flags:
             if self.user_dict.get("RCLONE_FLAGS"):
@@ -258,41 +330,44 @@ class TaskConfig:
             if self.up_dest in self.user_dict["UPLOAD_PATHS"]:
                 self.up_dest = self.user_dict["UPLOAD_PATHS"][self.up_dest]
         elif (
-            "UPLOAD_PATHS" not in self.user_dict
+            (
+                "UPLOAD_PATHS" not in self.user_dict
+                or not self.user_dict["UPLOAD_PATHS"]
+            )
             and Config.UPLOAD_PATHS
             and self.up_dest in Config.UPLOAD_PATHS
         ):
             self.up_dest = Config.UPLOAD_PATHS[self.up_dest]
 
-        if self.ffmpeg_cmds and not isinstance(self.ffmpeg_cmds, list):
+        if self.ffmpeg_cmds:
             if self.user_dict.get("FFMPEG_CMDS", None):
                 ffmpeg_dict = deepcopy(self.user_dict["FFMPEG_CMDS"])
-            elif "FFMPEG_CMDS" not in self.user_dict and Config.FFMPEG_CMDS:
+            elif (
+                "FFMPEG_CMDS" not in self.user_dict
+                or not self.user_dict["FFMPEG_CMDS"]
+            ) and Config.FFMPEG_CMDS:
                 ffmpeg_dict = deepcopy(Config.FFMPEG_CMDS)
             else:
                 ffmpeg_dict = None
-            if ffmpeg_dict is None:
-                self.ffmpeg_cmds = ffmpeg_dict
-            else:
-                cmds = []
-                for key in list(self.ffmpeg_cmds):
-                    if isinstance(key, tuple):
-                        cmds.extend(list(key))
-                    elif key in ffmpeg_dict:
-                        for ind, vl in enumerate(ffmpeg_dict[key]):
-                            if variables := set(findall(r"\{(.*?)\}", vl)):
-                                ff_values = (
-                                    self.user_dict.get("FFMPEG_VARIABLES", {})
-                                    .get(key, {})
-                                    .get(str(ind), {})
-                                )
-                                if Counter(list(variables)) == Counter(
-                                    list(ff_values.keys())
-                                ):
-                                    cmds.append(vl.format(**ff_values))
-                            else:
-                                cmds.append(vl)
-                self.ffmpeg_cmds = cmds
+            cmds = []
+            for key in list(self.ffmpeg_cmds):
+                if isinstance(key, tuple):
+                    cmds.extend(list(key))
+                elif ffmpeg_dict is not None and key in ffmpeg_dict:
+                    for ind, vl in enumerate(ffmpeg_dict[key]):
+                        if variables := set(findall(r"\{(.*?)\}", vl)):
+                            ff_values = (
+                                self.user_dict.get("FFMPEG_VARIABLES", {})
+                                .get(key, {})
+                                .get(str(ind), {})
+                            )
+                            if Counter(list(variables)) == Counter(
+                                list(ff_values.keys())
+                            ):
+                                cmds.append(vl.format(**ff_values))
+                        else:
+                            cmds.append(vl)
+            self.ffmpeg_cmds = cmds
         if not self.is_leech:
             self.stop_duplicate = self.user_dict.get("STOP_DUPLICATE") or (
                 "STOP_DUPLICATE" not in self.user_dict and Config.STOP_DUPLICATE
@@ -333,20 +408,18 @@ class TaskConfig:
                     raise ValueError(
                         "GoFile API token not configured! Please set your GoFile token in user settings or configure a global token."
                     )
-            if is_gdrive_id(self.up_dest):
-                if not self.up_dest.startswith(
-                    ("mtp:", "tp:", "sa:"),
-                ) and self.user_dict.get("USER_TOKENS", False):
-                    self.up_dest = f"mtp:{self.up_dest}"
-            elif is_rclone_path(self.up_dest):
-                if not self.up_dest.startswith("mrcc:") and self.user_dict.get(
-                    "USER_TOKENS",
-                    False,
-                ):
-                    self.up_dest = f"mrcc:{self.up_dest}"
-                self.up_dest = self.up_dest.strip("/")
-
             if self.up_dest not in ["rcl", "gdl"]:
+                if is_gdrive_id(self.up_dest):
+                    if not self.up_dest.startswith(
+                        ("mtp:", "tp:", "sa:")
+                    ) and self.user_dict.get("USER_TOKENS", False):
+                        self.up_dest = f"mtp:{self.up_dest}"
+                elif is_rclone_path(self.up_dest):
+                    if not self.up_dest.startswith("mrcc:") and self.user_dict.get(
+                        "USER_TOKENS", False
+                    ):
+                        self.up_dest = f"mrcc:{self.up_dest}"
+                    self.up_dest = self.up_dest.strip("/")
                 await self.is_token_exists(self.up_dest, "up")
 
             if self.up_dest == "rcl":
@@ -431,21 +504,36 @@ class TaskConfig:
                     except Exception:
                         chat = None
                     if chat is None:
+                        LOGGER.warning(
+                            "Account of user session can't find the the destination chat!"
+                        )
                         self.user_transmission = False
                         self.hybrid_leech = False
-                    else:
-                        uploader_id = TgClient.user.me.id
-                        if chat.type.name not in ["SUPERGROUP", "CHANNEL", "GROUP"]:
+                    elif chat.type.name not in [
+                        "SUPERGROUP",
+                        "CHANNEL",
+                        "GROUP",
+                        "FORUM",
+                    ]:
+                        self.user_transmission = False
+                        self.hybrid_leech = False
+                    elif chat.is_admin:
+                        member = await chat.get_member(TgClient.user.me.id)
+                        if (
+                            not member.privileges.can_manage_chat
+                            or not member.privileges.can_delete_messages
+                        ):
                             self.user_transmission = False
                             self.hybrid_leech = False
-                        else:
-                            member = await chat.get_member(uploader_id)
-                            if (
-                                not member.privileges.can_manage_chat
-                                or not member.privileges.can_delete_messages
-                            ):
-                                self.user_transmission = False
-                                self.hybrid_leech = False
+                            LOGGER.warning(
+                                "Enable manage chat and delete messages to account of the user session from administration settings!"
+                            )
+                    else:
+                        LOGGER.warning(
+                            "Promote the account of the user session to admin in the chat to get the benefit of user transmission!"
+                        )
+                        self.user_transmission = False
+                        self.hybrid_leech = False
 
                 if not self.user_transmission or self.hybrid_leech:
                     try:
@@ -457,29 +545,36 @@ class TaskConfig:
                             self.hybrid_leech = False
                         else:
                             raise ValueError("Chat not found!")
-                    else:
-                        uploader_id = self.client.me.id
-                        if chat.type.name in ["SUPERGROUP", "CHANNEL", "GROUP"]:
-                            member = await chat.get_member(uploader_id)
-                            if (
-                                not member.privileges.can_manage_chat
-                                or not member.privileges.can_delete_messages
-                            ):
-                                if not self.user_transmission:
-                                    raise ValueError(
-                                        "You don't have enough privileges in this chat!",
-                                    )
-                                self.hybrid_leech = False
-                        else:
-                            try:
-                                await self.client.send_chat_action(
-                                    self.up_dest,
-                                    ChatAction.TYPING,
-                                )
-                            except Exception:
+                    elif chat.type.name in [
+                        "SUPERGROUP",
+                        "CHANNEL",
+                        "GROUP",
+                        "FORUM",
+                    ]:
+                        if not chat.is_admin:
+                            raise ValueError(
+                                "Bot is not admin in the destination chat!"
+                            )
+                        member = await chat.get_member(self.client.me.id)
+                        if (
+                            not member.privileges.can_manage_chat
+                            or not member.privileges.can_delete_messages
+                        ):
+                            if not self.user_transmission:
                                 raise ValueError(
-                                    "Start the bot and try again!",
-                                ) from None
+                                    "You don't have enough privileges in this chat! Enable manage chat and delete messages for this bot!"
+                                )
+                            self.hybrid_leech = False
+                    else:
+                        try:
+                            await self.client.send_chat_action(
+                                self.up_dest,
+                                ChatAction.TYPING,
+                            )
+                        except Exception:
+                            raise ValueError(
+                                "Start the bot and try again!",
+                            ) from None
             elif (
                 self.user_transmission or self.hybrid_leech
             ) and not self.is_super_chat:
@@ -603,13 +698,16 @@ class TaskConfig:
 
     async def get_tag(self, text: list):
         if len(text) > 1 and text[1].startswith("Tag: "):
+            self.is_rss = True
             user_info = text[1].split("Tag: ")
             if len(user_info) >= 3:
                 id_ = user_info[-1]
                 self.tag = " ".join(user_info[:-1])
             else:
                 self.tag, id_ = text[1].split("Tag: ")[1].split()
-            self.user = self.message.from_user = await self.client.get_users(id_)
+            self.user = self.message.from_user = await self.client.get_users(
+                int(id_)
+            )
             self.user_id = self.user.id
             self.user_dict = user_data.get(self.user_id, {})
             with contextlib.suppress(Exception):
@@ -694,7 +792,7 @@ class TaskConfig:
             index = self.options.index("-b")
             del self.options[index]
             if bulk_start or bulk_end:
-                del self.options[index + 1]
+                del self.options[index]
             self.options = " ".join(self.options)
             b_msg.append(f"{self.bulk[0]} -i {len(self.bulk)} {self.options}")
             msg = " ".join(b_msg)
@@ -820,10 +918,17 @@ class TaskConfig:
                 input_indexes = [
                     index for index, value in enumerate(cmd) if value == "-i"
                 ]
-                for index in input_indexes:
-                    if cmd[index + 1].startswith("mltb"):
-                        input_file = cmd[index + 1]
-                        break
+                input_file = next(
+                    (
+                        cmd[index + 1]
+                        for index in input_indexes
+                        if cmd[index + 1].startswith("mltb")
+                    ),
+                    "",
+                )
+                if not input_file:
+                    LOGGER.error("Wrong FFmpeg cmd!")
+                    return dl_path
                 if input_file.lower().endswith(".video"):
                     ext = "video"
                 elif input_file.lower().endswith(".audio"):
@@ -866,16 +971,17 @@ class TaskConfig:
                         await cpu_eater_lock.acquire()
                         self.progress = True
                     LOGGER.info(f"Running FFmpeg command for: {file_path}")
+                    var_cmd = cmd.copy()
                     for index in input_indexes:
                         if cmd[index + 1].startswith("mltb"):
-                            cmd[index + 1] = file_path
+                            var_cmd[index + 1] = file_path
                         elif is_telegram_link(cmd[index + 1]):
                             msg = (await get_tg_link_message(cmd[index + 1]))[0]
                             file_dir = await temp_download(msg)
                             inputs[index + 1] = file_dir
-                            cmd[index + 1] = file_dir
+                            var_cmd[index + 1] = file_dir
                     self.subsize = self.size
-                    res = await ffmpeg.ffmpeg_cmds(cmd, file_path)
+                    res = await ffmpeg.ffmpeg_cmds(var_cmd, file_path)
                     if res:
                         if delete_files:
                             await remove(file_path)
@@ -923,7 +1029,16 @@ class TaskConfig:
                             ):
                                 continue
                             self.proceed_count += 1
-                            var_cmd[index + 1] = f_path
+                            for index in input_indexes:
+                                if cmd[index + 1].startswith("mltb"):
+                                    var_cmd[index + 1] = f_path
+                                elif is_telegram_link(cmd[index + 1]):
+                                    msg = (
+                                        await get_tg_link_message(cmd[index + 1])
+                                    )[0]
+                                    file_dir = await temp_download(msg)
+                                    inputs[index + 1] = file_dir
+                                    var_cmd[index + 1] = file_dir
                             if not checked:
                                 checked = True
                                 async with task_dict_lock:
@@ -963,6 +1078,8 @@ class TaskConfig:
             for substitution in substitutions:
                 sen = False
                 pattern = substitution[0]
+                if pattern.startswith('"') and pattern.endswith('"'):
+                    pattern = pattern.strip('"')
                 if len(substitution) > 1:
                     if len(substitution) > 2:
                         sen = substitution[2] == "s"
@@ -975,7 +1092,7 @@ class TaskConfig:
                     res = ""
                 try:
                     name = sub(
-                        rf"{pattern}",
+                        pattern,
                         res,
                         name,
                         flags=IGNORECASE if sen else 0,
@@ -1034,6 +1151,33 @@ class TaskConfig:
             for file_ in files:
                 f_path = ospath.join(dirpath, file_)
                 new_name = clean_filename(file_)
+                if new_name == file_:
+                    continue
+                with contextlib.suppress(Exception):
+                    await move(f_path, ospath.join(dirpath, new_name))
+
+        return dl_path
+
+    async def proceed_name_prefix(self, dl_path):
+        def add_prefix(name):
+            if name.startswith(self.name_prefix):
+                return name
+            return f"{self.name_prefix} {name}"
+
+        if self.is_file:
+            up_dir, name = dl_path.rsplit("/", 1)
+            new_name = add_prefix(name)
+            if new_name == name:
+                return dl_path
+            new_path = ospath.join(up_dir, new_name)
+            with contextlib.suppress(Exception):
+                await move(dl_path, new_path)
+            return new_path
+
+        for dirpath, _, files in await sync_to_async(walk, dl_path, topdown=False):
+            for file_ in files:
+                f_path = ospath.join(dirpath, file_)
+                new_name = add_prefix(file_)
                 if new_name == file_:
                     continue
                 with contextlib.suppress(Exception):
@@ -1423,9 +1567,7 @@ class TaskConfig:
                         cpu_eater_lock.release()
                         return ""
                     if is_mkv(file_path):
-                        cmd, temp_file = await get_watermark_cmd(
-                            file_path, key, self.user_id
-                        )
+                        cmd, temp_file = await get_watermark_cmd(file_path, key, self.user_id)
                         if cmd:
                             if not checked:
                                 checked = True

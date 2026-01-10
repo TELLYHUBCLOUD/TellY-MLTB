@@ -1,16 +1,13 @@
 import asyncio
+from time import time
 
-from bot import LOGGER, task_dict, task_dict_lock
+from bot import LOGGER, qbit_options, task_dict, task_dict_lock
+from bot.core.config_manager import Config
 from bot.core.torrent_manager import TorrentManager
-from bot.helper.ext_utils.task_manager import (
-    check_running_tasks,
-    stop_duplicate_check,
-)
+from bot.helper.ext_utils.bot_utils import new_task
+from bot.helper.ext_utils.task_manager import check_running_tasks, stop_duplicate_check
 from bot.helper.mirror_leech_utils.status_utils.qbit_status import QbittorrentStatus
-from bot.helper.telegram_helper.message_utils import (
-    send_message,
-    send_status_message,
-)
+from bot.helper.telegram_helper.message_utils import send_message, send_status_message
 
 
 async def add_qb_torrent(listener, path, ratio, seed_time):
@@ -39,9 +36,7 @@ async def add_qb_torrent(listener, path, ratio, seed_time):
         return
 
     if op.lower() == "ok.":
-        tor_info = await TorrentManager.qbittorrent.torrents_info(
-            tag=f"{listener.mid}"
-        )
+        tor_info = await TorrentManager.qbittorrent.torrents_info(tag=f"{listener.mid}")
         if len(tor_info) == 0:
             while True:
                 tor_info = await TorrentManager.qbittorrent.torrents_info(
@@ -56,7 +51,9 @@ async def add_qb_torrent(listener, path, ratio, seed_time):
         listener.name = tor_info.name
 
         async with task_dict_lock:
-            task_dict[listener.mid] = QbittorrentStatus(listener, ext_hash, "dl")
+            task_dict[listener.mid] = QbittorrentStatus(
+                listener, ext_hash, "dl"
+            )
 
         if listener.select:
             await TorrentManager.qbittorrent.torrents_pause(hashes=ext_hash)
@@ -70,6 +67,4 @@ async def add_qb_torrent(listener, path, ratio, seed_time):
         if listener.multi <= 1:
             await send_status_message(listener.message)
     else:
-        await send_message(
-            listener.message, "qBittorrent Error: Failed to add torrent!"
-        )
+        await send_message(listener.message, "qBittorrent Error: Failed to add torrent!")

@@ -32,7 +32,11 @@ class GoogleDriveDownload(GoogleDriveHelper):
             await self.listener.on_download_error("File not found!")
             return
 
-        self.listener.name = self.listener.name or file.get("name") or "Unknown"
+        self.listener.name = (
+            self.listener.name
+            or file.get("name")
+            or "Unknown"
+        )
 
         if file.get("mimeType") == self.G_DRIVE_DIR_MIME_TYPE:
             self.listener.is_file = False

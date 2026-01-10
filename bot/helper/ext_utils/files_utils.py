@@ -1,10 +1,11 @@
 from asyncio import create_subprocess_exec, wait_for
 from asyncio.subprocess import PIPE
 from os import path as ospath
-from os import walk
+from os import readlink, walk
 from re import search as re_search
 
-from aiofiles.os import remove
+from aiofiles.os import makedirs, remove
+from aioshutil import move
 
 from bot import LOGGER
 from bot.helper.ext_utils.bot_utils import sync_to_async
@@ -161,7 +162,8 @@ def get_base_name(orig_path):
     )
     if not extension:
         raise NotSupportedExtractor
-    return orig_path.rsplit(extension, 1)[0]
+    name = orig_path.rsplit(extension, 1)[0]
+    return name
 
 
 def get_mime_type(file_path: str) -> str:
@@ -246,9 +248,7 @@ async def split_file(path, split_size, listener):
 
 
 def is_archive(file_path):
-    return file_path.endswith(
-        (".zip", ".rar", ".tar", ".7z", ".gz", ".bz2", ".xz", ".iso")
-    )
+    return file_path.endswith((".zip", ".rar", ".tar", ".7z", ".gz", ".bz2", ".xz", ".iso"))
 
 
 def is_archive_split(file_path):

@@ -1,13 +1,17 @@
-from aiofiles.os import path as aiopath
-from aiofiles.os import remove
+from asyncio import create_subprocess_exec, create_subprocess_shell
+from os import path as ospath
 
-from bot import LOGGER, intervals, scheduler
+from aiofiles import open as aiopen
+from aiofiles.os import remove, path as aiopath
+
+from bot import LOGGER, intervals, sabnzbd_client, scheduler
 from bot.core.config_manager import Config
+from bot.core.jdownloader_booter import jdownloader
 from bot.core.telegram_manager import TgClient
 from bot.core.torrent_manager import TorrentManager
 from bot.helper.ext_utils.bot_utils import new_task
 from bot.helper.ext_utils.db_handler import database
-from bot.helper.telegram_helper.message_utils import send_message
+from bot.helper.telegram_helper.message_utils import send_message, update_all_messages
 
 
 @new_task
@@ -16,7 +20,7 @@ async def restart_bot(_, message):
         with open(".restartmsg") as f:
             chat_id, msg_id = map(int, f)
     else:
-        _chat_id, _msg_id = 0, 0
+        chat_id, msg_id = 0, 0
 
     msg = "Restarting..."
     if message and message.from_user:

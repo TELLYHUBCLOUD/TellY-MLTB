@@ -3,15 +3,10 @@ from time import time
 
 from bot import LOGGER, task_dict, task_dict_lock
 from bot.core.jdownloader_booter import jdownloader
-from bot.helper.ext_utils.task_manager import (
-    check_running_tasks,
-    stop_duplicate_check,
-)
+from bot.helper.ext_utils.bot_utils import new_task
+from bot.helper.ext_utils.task_manager import check_running_tasks, stop_duplicate_check
 from bot.helper.mirror_leech_utils.status_utils.jd_status import JDownloaderStatus
-from bot.helper.telegram_helper.message_utils import (
-    send_message,
-    send_status_message,
-)
+from bot.helper.telegram_helper.message_utils import send_message, send_status_message
 
 
 async def add_jd_download(listener, path):
@@ -85,4 +80,6 @@ async def add_jd_download(listener, path):
         await send_status_message(listener.message)
 
     async with task_dict_lock:
-        task_dict[listener.mid] = JDownloaderStatus(listener, listener.mid, "dl")
+        task_dict[listener.mid] = JDownloaderStatus(
+            listener, listener.mid, "dl"
+        )

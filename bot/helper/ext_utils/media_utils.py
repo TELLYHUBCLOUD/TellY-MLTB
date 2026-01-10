@@ -1,16 +1,18 @@
+import contextlib
 from asyncio import create_subprocess_exec, gather, wait_for
 from asyncio.subprocess import PIPE
 from os import path as ospath
 from re import escape
 from time import time
 
-from aiofiles.os import makedirs
+from aiofiles.os import makedirs, remove
 from aioshutil import rmtree
+from PIL import Image
 
-from bot import DOWNLOAD_DIR, LOGGER, threads
+from bot import DOWNLOAD_DIR, LOGGER, cores, threads
 
 from .bot_utils import cmd_exec, sync_to_async
-from .files_utils import get_mime_type, is_archive_split
+from .files_utils import get_mime_type, is_archive, is_archive_split
 
 
 async def create_thumb(msg, _=None):
@@ -28,11 +30,17 @@ async def create_thumb(msg, _=None):
     if msg.photo:
         if not msg.photo.file_size:
             return ""
-    elif msg.document and not msg.document.file_size:
-        return ""
+    elif msg.document:
+        if not msg.document.file_size:
+            return ""
     des_dir = f"{DOWNLOAD_DIR}thumbnails/"
     await makedirs(des_dir, exist_ok=True)
-    ext = ".jpg" if msg.photo else ospath.splitext(msg.document.file_name)[1]
+    if msg.photo:
+        file_id = msg.photo.file_id
+        ext = ".jpg"
+    else:
+        file_id = msg.document.file_id
+        ext = ospath.splitext(msg.document.file_name)[1]
     path = f"{des_dir}{time()}{ext}"
     await msg.download(file_name=path)
     return path
@@ -153,10 +161,7 @@ async def get_document_type(path):
 async def take_ss(video_file, ss_nb) -> bool:
     duration = (await get_media_info(video_file))[0]
     if duration != 0:
-        dirpath = ospath.join(
-            ospath.dirname(video_file),
-            f"{ospath.splitext(ospath.basename(video_file))[0]}_ss",
-        )
+        dirpath = ospath.join(ospath.dirname(video_file), f"{ospath.splitext(ospath.basename(video_file))[0]}_ss")
         await makedirs(dirpath, exist_ok=True)
         interval = duration // (ss_nb + 1)
         cap_time = interval
@@ -347,7 +352,9 @@ class FFMpeg:
                 progress["size"] = int(line.split("=")[1])
             if "time" in progress:
                 self._processed_bytes = progress["size"]
-                self._progress_raw = (self._processed_bytes / self._subsize) * 100
+                self._progress_raw = (
+                    self._processed_bytes / self._subsize
+                ) * 100
                 try:
                     self._eta_raw = (
                         self._subsize - self._processed_bytes
@@ -476,7 +483,9 @@ class FFMpeg:
         return False
 
     async def sample_video(self, video_file, sample_duration, part_duration):
-        output_file = f"{ospath.splitext(video_file)[0]}_sample.{ospath.splitext(video_file)[1]}"
+        output_file = (
+            f"{ospath.splitext(video_file)[0]}_sample.{ospath.splitext(video_file)[1]}"
+        )
         segments = []
         duration = (await get_media_info(video_file))[0]
         if duration == 0:
@@ -487,12 +496,8 @@ class FFMpeg:
         filter_complex = ""
         for i in range(total_parts):
             start_time = (i + 1) * interval
-            segments.append(
-                f"[0:v]trim=start={start_time}:duration={part_duration},setpts=PTS-STARTPTS[v{i}];"
-            )
-            segments.append(
-                f"[0:a]atrim=start={start_time}:duration={part_duration},asetpts=PTS-STARTPTS[a{i}];"
-            )
+            segments.append(f"[0:v]trim=start={start_time}:duration={part_duration},setpts=PTS-STARTPTS[v{i}];")
+            segments.append(f"[0:a]atrim=start={start_time}:duration={part_duration},asetpts=PTS-STARTPTS[a{i}];")
             filter_complex += f"[v{i}][a{i}]"
 
         filter_complex = "".join(segments) + filter_complex
@@ -588,9 +593,7 @@ class FFMpeg:
                 return False
             lpd = (await get_media_info(out_path))[0]
             if lpd == 0:
-                LOGGER.error(
-                    f"Something went wrong while splitting the file: {f_path}"
-                )
+                LOGGER.error(f"Something went wrong while splitting the file: {f_path}")
                 break
             start_time += lpd - 3
             i += 1
@@ -602,3 +605,51 @@ class FFMpeg:
             if lpd <= 3:
                 break
         return True
+
+    async def merge(self, file_path, merge_paths, metadata_key=""):
+        output = f"{file_path}.merged.mkv"
+        cmd = [
+            "xtra",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-progress",
+            "pipe:1",
+            "-i",
+            file_path,
+        ]
+
+        input_count = 1
+        for path in merge_paths:
+            cmd.extend(["-i", path])
+            input_count += 1
+
+        cmd.extend([
+            "-c", "copy",
+            "-map", "0",
+        ])
+
+        for i in range(1, input_count):
+            cmd.extend(["-map", f"{i}"])
+
+        if metadata_key:
+             cmd.extend(["-metadata", f"title={metadata_key}"])
+
+        cmd.extend([
+            "-threads",
+            f"{threads}",
+            output,
+        ])
+
+        if self._listener.is_cancelled:
+            return False
+        self._listener.subproc = await create_subprocess_exec(
+            *cmd,
+            stdout=PIPE,
+            stderr=PIPE,
+        )
+        await self._ffmpeg_progress()
+        returncode = await self._listener.subproc.wait()
+        if returncode == 0:
+            return output
+        return False

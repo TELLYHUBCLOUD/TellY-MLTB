@@ -1,8 +1,11 @@
+import asyncio
 from os import path as ospath
 
+from aiofiles import open as aiopen
 from aiofiles.os import remove as aioremove
 
 from bot import LOGGER
+from bot.core.telegram_manager import TgClient
 from bot.helper.aeon_utils.access_check import token_check
 from bot.helper.ext_utils.bot_utils import cmd_exec
 from bot.helper.ext_utils.telegraph_helper import telegraph
@@ -26,7 +29,9 @@ async def mediainfo(_, message):
     try:
         file_path = await reply_to.download()
 
-        stdout, _stderr, _ = await cmd_exec(["mediainfo", file_path])
+        stdout, stderr, _ = await cmd_exec(
+            ["mediainfo", file_path]
+        )
 
         if not stdout:
             await delete_message(msg)

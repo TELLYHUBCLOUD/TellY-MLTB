@@ -71,9 +71,7 @@ class GoogleDriveList(GoogleDriveHelper):
                 url = f"{self.INDEX_URL}findpath?id={file.get('id')}"
                 msg += f" | <a href='{url}'>Index Link</a>"
                 if file.get("mimeType").startswith(("video", "audio", "image")):
-                    url_view = (
-                        f"{self.INDEX_URL}findpath?id={file.get('id')}&view=true"
-                    )
+                    url_view = f"{self.INDEX_URL}findpath?id={file.get('id')}&view=true"
                     msg += f" | <a href='{url_view}'>View Link</a>"
             msg += "\n\n"
 

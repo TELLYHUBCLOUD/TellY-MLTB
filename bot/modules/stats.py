@@ -1,12 +1,6 @@
 from time import time
 
-from psutil import (
-    cpu_percent,
-    disk_usage,
-    net_io_counters,
-    swap_memory,
-    virtual_memory,
-)
+from psutil import cpu_percent, disk_usage, net_io_counters, swap_memory, virtual_memory
 
 from bot import bot_start_time
 from bot.helper.ext_utils.bot_utils import (

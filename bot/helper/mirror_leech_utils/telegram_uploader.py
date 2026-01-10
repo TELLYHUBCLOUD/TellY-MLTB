@@ -4,16 +4,15 @@ from logging import getLogger
 from os import path as ospath
 from os import walk
 from re import match as re_match
+from re import sub as re_sub
 from time import time
 
 from aiofiles import open as aiopen
 from aiofiles.os import (
+    path as aiopath,
     makedirs,
     remove,
     rename,
-)
-from aiofiles.os import (
-    path as aiopath,
 )
 from aioshutil import rmtree
 from natsort import natsorted
@@ -209,30 +208,15 @@ class TelegramUploader:
                 from bot.modules.imdb import get_poster, get_tmdb_result
 
                 metadata_info = None
-                tmdb_key = user_dict.get("TMDB_API_KEY") or (
-                    Config.TMDB_API_KEY if hasattr(Config, "TMDB_API_KEY") else ""
-                )
-                tmdb_enabled = user_dict.get(
-                    "TMDB_ENABLED",
-                    Config.TMDB_ENABLED if hasattr(Config, "TMDB_ENABLED") else True,
-                )
-                imdb_enabled = user_dict.get(
-                    "IMDB_ENABLED",
-                    Config.IMDB_ENABLED if hasattr(Config, "IMDB_ENABLED") else True,
-                )
+                tmdb_key = user_dict.get("TMDB_API_KEY") or (Config.TMDB_API_KEY if hasattr(Config, 'TMDB_API_KEY') else "")
+                tmdb_enabled = user_dict.get("TMDB_ENABLED", Config.TMDB_ENABLED if hasattr(Config, 'TMDB_ENABLED') else True)
+                imdb_enabled = user_dict.get("IMDB_ENABLED", Config.IMDB_ENABLED if hasattr(Config, 'IMDB_ENABLED') else True)
                 thumb_format = user_dict.get("AUTO_THUMBNAIL_FORMAT", "poster")
-                auto_thumb = user_dict.get(
-                    "AUTO_THUMBNAIL_ENABLED",
-                    Config.AUTO_THUMBNAIL_ENABLED
-                    if hasattr(Config, "AUTO_THUMBNAIL_ENABLED")
-                    else False,
-                )
+                auto_thumb = user_dict.get("AUTO_THUMBNAIL_ENABLED", Config.AUTO_THUMBNAIL_ENABLED if hasattr(Config, 'AUTO_THUMBNAIL_ENABLED') else False)
 
                 if probable_title:
                     if tmdb_enabled and tmdb_key:
-                        metadata_info = get_tmdb_result(
-                            probable_title, tmdb_key, thumb_format
-                        )
+                        metadata_info = get_tmdb_result(probable_title, tmdb_key, thumb_format)
 
                     if not metadata_info and imdb_enabled:
                         metadata_info = get_poster(probable_title)
@@ -241,9 +225,7 @@ class TelegramUploader:
                     imdb_data = {
                         "title": metadata_info.get("title", ""),
                         "year": metadata_info.get("year", ""),
-                        "rating": metadata_info.get("rating", "").replace(
-                            " / 10", ""
-                        ),
+                        "rating": metadata_info.get("rating", "").replace(" / 10", ""),
                         "genre": metadata_info.get("genres", ""),
                     }
                     if auto_thumb and metadata_info.get("poster"):
@@ -616,40 +598,25 @@ class TelegramUploader:
 
                     current_thumb = None
                     if self._current_thumb:
-                        if (
-                            self._thumb
-                            and self._thumb != "none"
-                            and await aiopath.exists(self._thumb)
-                        ):
-                            pass
+                        if self._thumb and self._thumb != "none" and await aiopath.exists(self._thumb):
+                             pass
                         else:
                             try:
                                 import requests
+                                from bot.helper.ext_utils.bot_utils import sync_to_async
 
-                                from bot.helper.ext_utils.bot_utils import (
-                                    sync_to_async,
-                                )
-
-                                thumb_path = (
-                                    f"thumbnails/{self._user_id}_{time()}.jpg"
-                                )
+                                thumb_path = f"thumbnails/{self._user_id}_{time()}.jpg"
                                 await makedirs("thumbnails", exist_ok=True)
 
-                                req = await sync_to_async(
-                                    requests.get, self._current_thumb
-                                )
+                                req = await sync_to_async(requests.get, self._current_thumb)
                                 if req.status_code == 200:
                                     async with aiopen(thumb_path, "wb") as f:
                                         await f.write(req.content)
                                     current_thumb = thumb_path
                             except Exception as e:
-                                LOGGER.error(
-                                    f"Failed to download auto thumbnail: {e}"
-                                )
+                                LOGGER.error(f"Failed to download auto thumbnail: {e}")
 
-                    await self._upload_file(
-                        cap_mono, file_, f_path, current_thumb=current_thumb
-                    )
+                    await self._upload_file(cap_mono, file_, f_path, current_thumb=current_thumb)
                     if self._listener.is_cancelled:
                         return
                     if (
@@ -709,11 +676,13 @@ class TelegramUploader:
         stop=stop_after_attempt(3),
         retry=retry_if_exception_type(Exception),
     )
-    async def _upload_file(
-        self, cap_mono, file, o_path, force_document=False, current_thumb=None
-    ):
+    async def _upload_file(self, cap_mono, file, o_path, force_document=False, current_thumb=None):
         thumb = current_thumb or self._thumb
-        if thumb is not None and not await aiopath.exists(thumb) and thumb != "none":
+        if (
+            thumb is not None
+            and not await aiopath.exists(thumb)
+            and thumb != "none"
+        ):
             thumb = None
         self._is_corrupted = False
         try:
@@ -851,13 +820,7 @@ class TelegramUploader:
                 and await aiopath.exists(thumb)
             ):
                 await remove(thumb)
-            return await self._upload_file(
-                cap_mono,
-                file,
-                o_path,
-                force_document=force_document,
-                current_thumb=current_thumb,
-            )
+            return await self._upload_file(cap_mono, file, o_path, force_document=force_document, current_thumb=current_thumb)
         except Exception as err:
             if (
                 (self._thumb is None or thumb != self._thumb)

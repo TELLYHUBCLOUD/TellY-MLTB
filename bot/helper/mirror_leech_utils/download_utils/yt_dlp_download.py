@@ -1,21 +1,16 @@
 import builtins
 import contextlib
-from os import listdir
-from os import path as ospath
+from logging import getLogger
+from os import listdir, path as ospath
 from re import search as re_search
 
 from yt_dlp import YoutubeDL
 
 from bot import LOGGER, task_dict, task_dict_lock
-from bot.helper.ext_utils.task_manager import (
-    check_running_tasks,
-    stop_duplicate_check,
-)
+from bot.helper.ext_utils.bot_utils import new_task
+from bot.helper.ext_utils.task_manager import check_running_tasks, stop_duplicate_check
 from bot.helper.mirror_leech_utils.status_utils.yt_dlp_status import YtDlpStatus
-from bot.helper.telegram_helper.message_utils import (
-    send_message,
-    send_status_message,
-)
+from bot.helper.telegram_helper.message_utils import send_message, send_status_message
 
 
 class MyLogger:
@@ -116,6 +111,7 @@ class YtDlpDownload:
             if self._listener.mid in task_dict:
                 del task_dict[self._listener.mid]
         LOGGER.error(f"{self._listener.name} | {error}")
+        return
 
     def _extract_meta_data(self):
         if self._listener.link.startswith(("rtmp", "mms", "rstp", "rtmps")):

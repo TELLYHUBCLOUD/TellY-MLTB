@@ -1,14 +1,24 @@
+# -*- coding: utf-8 -*-
 """
-myjdapi
-~~~~~~~
+    myjdapi
+    ~~~~~~~
 
-:author:     Rudolf
-:copyright:  Copyright 2016 Rudolf
-:license:    GPLv3, see LICENSE for details.
-:version:    1.1.7
+    :author:     Rudolf
+    :copyright:  Copyright 2016 Rudolf
+    :license:    GPLv3, see LICENSE for details.
+    :version:    1.1.7
 """
 
+import asyncio
+import base64
+import hmac
+import json
 import time
+from hashlib import sha256
+from uuid import uuid4
+
+import aiohttp
+from Cryptodome.Cipher import AES
 
 
 def chunks(l, n):

@@ -11,6 +11,8 @@ from tenacity import (
 )
 
 from bot import intervals
+from bot.core.config_manager import Config
+from bot.helper.ext_utils.bot_utils import SetInterval, async_to_sync
 from bot.helper.ext_utils.files_utils import get_mime_type
 from bot.helper.mirror_leech_utils.gdrive_utils.helper import GoogleDriveHelper
 
@@ -75,10 +77,10 @@ class GoogleDriveUpload(GoogleDriveHelper):
 
     def _upload_dir(self, input_directory, dest_id):
         if self._is_cancelled:
-            return None
+            return
         list_dirs = listdir(input_directory)
         if len(list_dirs) == 0:
-            return None
+            return
         new_id = None
         for item in list_dirs:
             current_file_name = ospath.join(input_directory, item)

@@ -14,7 +14,7 @@ from tenacity import (
 
 from bot import user_data
 from bot.core.config_manager import Config
-from bot.helper.ext_utils.bot_utils import SetInterval
+from bot.helper.ext_utils.bot_utils import SetInterval, sync_to_async
 
 LOGGER = getLogger(__name__)
 
@@ -59,19 +59,19 @@ class GoFileUpload:
     async def __getAccount(self, check_account=False):
         if self.token is None:
             return None
-        async with (
-            ClientSession() as session,
-            session.get(f"{self.api_url}accounts/get?token={self.token}") as resp,
-        ):
-            try:
-                res = await resp.json()
-            except Exception:
-                return None
-            if res["status"] != "ok":
-                return None
-            if check_account:
-                return res["data"]
-            return res["data"]["rootFolder"]
+        async with ClientSession() as session:
+            async with session.get(
+                f"{self.api_url}accounts/get?token={self.token}"
+            ) as resp:
+                try:
+                    res = await resp.json()
+                except Exception:
+                    return None
+                if res["status"] != "ok":
+                    return None
+                if check_account:
+                    return res["data"]
+                return res["data"]["rootFolder"]
 
     @retry(
         wait=wait_exponential(multiplier=2, min=4, max=8),
@@ -136,12 +136,7 @@ class GoFileUpload:
         if self._is_cancelled:
             return None
         async with ClientSession() as session:
-            data = {
-                "token": self.token,
-                "folderId": folderId,
-                "option": option,
-                "value": value,
-            }
+            data = {"token": self.token, "folderId": folderId, "option": option, "value": value}
             async with session.put(
                 f"{self.api_url}contents/setOption", data=data
             ) as resp:
@@ -237,13 +232,13 @@ class GoFileUpload:
         if not token:
             return False
         try:
-            async with (
-                ClientSession() as session,
-                session.get(f"{self.api_url}accounts/get?token={token}") as resp,
-            ):
-                res = await resp.json()
-                if res["status"] == "ok":
-                    return True
+            async with ClientSession() as session:
+                async with session.get(
+                    f"{self.api_url}accounts/get?token={token}"
+                ) as resp:
+                    res = await resp.json()
+                    if res["status"] == "ok":
+                        return True
         except Exception:
             return False
         return False

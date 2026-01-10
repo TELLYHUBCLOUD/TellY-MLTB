@@ -3,6 +3,8 @@ from os import path as ospath
 
 from aiofiles import open as aiopen
 
+from bot import LOGGER
+from bot.core.telegram_manager import TgClient
 from bot.helper.ext_utils.bot_utils import new_task, sync_to_async
 from bot.helper.telegram_helper.message_utils import send_file, send_message
 
@@ -43,9 +45,8 @@ async def execute(_, message):
             reply_to_id=reply_to_id,
             caption=f"<b>Exec Command:</b> <code>{cmd}</code>",
         )
-        return None
+        return
     await send_message(message, f"<pre language='bash'>{o}</pre>")
-    return None
 
 
 @new_task

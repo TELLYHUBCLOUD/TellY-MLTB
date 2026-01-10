@@ -1,9 +1,6 @@
 from logging import getLogger
 from os import path as ospath
 
-from aiofiles.os import makedirs
-
-from bot.helper.ext_utils.bot_utils import sync_to_async
 from bot.helper.mirror_leech_utils.gdrive_utils.helper import GoogleDriveHelper
 
 LOGGER = getLogger(__name__)
@@ -24,7 +21,6 @@ class GoogleDriveClone(GoogleDriveHelper):
             file_id = self.get_id_from_url(self.listener.link)
         except (KeyError, IndexError):
             file_id = self.listener.link
-        msg = ""
         LOGGER.info(f"File ID: {file_id}")
         try:
             file = self.get_file_metadata(file_id)
@@ -36,25 +32,27 @@ class GoogleDriveClone(GoogleDriveHelper):
             await self.listener.on_upload_error("File not found!")
             return
 
-        self.listener.name = (
-            self.listener.name
-            or file.get("name")
-            or "Unknown"
-        )
+        self.listener.name = self.listener.name or file.get("name") or "Unknown"
 
         if self.listener.up_dest.startswith("mtp:"):
             self.listener.up_dest = self.listener.up_dest.replace("mtp:", "", 1)
 
         try:
             if file.get("mimeType") == self.G_DRIVE_DIR_MIME_TYPE:
-                await self._clone_folder(self.listener.name, file_id, self.listener.up_dest)
+                await self._clone_folder(
+                    self.listener.name, file_id, self.listener.up_dest
+                )
             else:
                 if (
                     self.listener.included_extensions
-                    and not self.listener.name.strip().lower().endswith(tuple(self.listener.included_extensions))
+                    and not self.listener.name.strip()
+                    .lower()
+                    .endswith(tuple(self.listener.included_extensions))
                 ) or (
                     not self.listener.included_extensions
-                    and self.listener.name.strip().lower().endswith(tuple(self.listener.excluded_extensions))
+                    and self.listener.name.strip()
+                    .lower()
+                    .endswith(tuple(self.listener.excluded_extensions))
                 ):
                     await self.listener.on_upload_error("File excluded!")
                     return
@@ -93,7 +91,7 @@ class GoogleDriveClone(GoogleDriveHelper):
         for file in files:
             if self._is_cancelled:
                 break
-            file_path = ospath.join(folder_name, file.get("name"))
+            ospath.join(folder_name, file.get("name"))
             if file.get("mimeType") == self.G_DRIVE_DIR_MIME_TYPE:
                 self._clone_folder(file.get("name"), file.get("id"), current_dir_id)
             elif (

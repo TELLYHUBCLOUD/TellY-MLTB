@@ -17,7 +17,6 @@ from pyrogram.enums import ChatAction
 from bot import (
     DOWNLOAD_DIR,
     LOGGER,
-    cores,
     cpu_eater_lock,
     excluded_extensions,
     included_extensions,
@@ -269,15 +268,17 @@ class TaskConfig:
             or self.user_dict.get("METADATA_KEY", False)
             or (Config.METADATA_KEY if "METADATA_KEY" not in self.user_dict else "")
         )
-        w_text = self.user_dict.get("WATERMARK_TEXT") or self.user_dict.get("WATERMARK_KEY") or (Config.WATERMARK_KEY if "WATERMARK_KEY" not in self.user_dict else "")
+        w_text = (
+            self.user_dict.get("WATERMARK_TEXT")
+            or self.user_dict.get("WATERMARK_KEY")
+            or (
+                Config.WATERMARK_KEY if "WATERMARK_KEY" not in self.user_dict else ""
+            )
+        )
         w_pos = self.user_dict.get("WATERMARK_POSITION") or "Top-Left"
         w_size = self.user_dict.get("WATERMARK_SIZE") or "20"
 
-        self.watermark = {
-            "text": w_text,
-            "position": w_pos,
-            "size": w_size
-        }
+        self.watermark = {"text": w_text, "position": w_pos, "size": w_size}
         if self.name_sub:
             self.name_sub = [x.split("/") for x in self.name_sub.split(" | ")]
         self.excluded_extensions = self.user_dict.get("EXCLUDED_EXTENSIONS") or (
@@ -1569,7 +1570,9 @@ class TaskConfig:
                         cpu_eater_lock.release()
                         return ""
                     if is_mkv(file_path):
-                        cmd, temp_file = await get_watermark_cmd(file_path, key, self.user_id)
+                        cmd, temp_file = await get_watermark_cmd(
+                            file_path, key, self.user_id
+                        )
                         if cmd:
                             if not checked:
                                 checked = True
@@ -1620,10 +1623,8 @@ class TaskConfig:
 
         res = await ffmpeg.merge(dl_path, merge_paths, self.metadata)
         if res:
-            try:
+            with contextlib.suppress(Exception):
                 await remove(dl_path)
-            except Exception:
-                pass
             return res
         return dl_path
 

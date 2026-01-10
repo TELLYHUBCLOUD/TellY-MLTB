@@ -6,7 +6,7 @@ from logging import (
     basicConfig,
     getLogger,
 )
-from os import makedirs, path, cpu_count
+from os import cpu_count, makedirs, path
 from socket import gethostname
 
 from dotenv import load_dotenv
@@ -39,13 +39,17 @@ basicConfig(
 )
 
 for handler in getLogger().handlers:
-    handler.setFormatter(CustomFormatter(handler.formatter._fmt, handler.formatter.datefmt))
+    handler.setFormatter(
+        CustomFormatter(handler.formatter._fmt, handler.formatter.datefmt)
+    )
 
 LOGGER = getLogger(__name__)
 
 cpu_no = cpu_count()
-threads = max(1, cpu_no // 2) # Dynamic threads
-cores = "" # Not used directly if we remove taskset, or generate dynamically if needed
+threads = max(1, cpu_no // 2)  # Dynamic threads
+cores = (
+    ""  # Not used directly if we remove taskset, or generate dynamically if needed
+)
 
 DOWNLOAD_DIR = "/app/downloads/"
 intervals = {
@@ -87,15 +91,31 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 scheduler = AsyncIOScheduler()
 
+
 class DummySabnzbd:
     def __init__(self):
         self.LOGGED_IN = False
-    async def pause_all(self): pass
-    async def delete_job(self, *args, **kwargs): pass
-    async def purge_all(self, *args, **kwargs): pass
-    async def delete_history(self, *args, **kwargs): pass
-    async def get_downloads(self, *args, **kwargs): return []
-    async def add_url(self, *args, **kwargs): return False
-    async def close(self): pass
+
+    async def pause_all(self):
+        pass
+
+    async def delete_job(self, *args, **kwargs):
+        pass
+
+    async def purge_all(self, *args, **kwargs):
+        pass
+
+    async def delete_history(self, *args, **kwargs):
+        pass
+
+    async def get_downloads(self, *args, **kwargs):
+        return []
+
+    async def add_url(self, *args, **kwargs):
+        return False
+
+    async def close(self):
+        pass
+
 
 sabnzbd_client = DummySabnzbd()

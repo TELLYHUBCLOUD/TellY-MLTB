@@ -1,22 +1,11 @@
-from argparse import ArgumentParser
-from asyncio import create_subprocess_exec, create_subprocess_shell
+from asyncio import create_subprocess_exec
 from asyncio.subprocess import PIPE
-from concurrent.futures import ThreadPoolExecutor
 from functools import partial, wraps
-from time import time
 
 from bot import (
-    DOWNLOAD_DIR,
-    LOGGER,
     bot_loop,
-    bot_start_time,
     cpu_eater_lock,
-    intervals,
-    task_dict,
-    task_dict_lock,
 )
-from bot.core.config_manager import Config
-from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.button_build import ButtonMaker
 
 COMMAND_USAGE = {}
@@ -100,15 +89,21 @@ async def get_readable_file_size(size_in_bytes):
         size_in_bytes /= 1024
         index += 1
     try:
-        return f"{round(size_in_bytes, 2)}{['B', 'KB', 'MB', 'GB', 'TB', 'PB'][index]}"
+        return (
+            f"{round(size_in_bytes, 2)}{['B', 'KB', 'MB', 'GB', 'TB', 'PB'][index]}"
+        )
     except IndexError:
         return "File too large"
 
 
 async def get_progress_bar_string(status):
-    completed = status.processed_bytes()
+    status.processed_bytes()
     total = status.size()
-    p = 0 if total == "0B" else round(status.processed_raw() / status.size_raw() * 100)
+    p = (
+        0
+        if total == "0B"
+        else round(status.processed_raw() / status.size_raw() * 100)
+    )
     p = min(p, 100)
     return f"[{'■' * (p // 10)}{'□' * (10 - p // 10)}] {p}%"
 
@@ -157,9 +152,16 @@ def arg_parser(items, arg_base):
                 arg_base[items[i]] = items[i + 1]
         elif i == 0 and not items[i].startswith("-"):
             arg_base["link"] = items[i]
-        elif items[i - 1] in ["-n", "-up", "-rcf", "-au", "-ap", "-h", "-t", "-m"]:
-            arg_base[items[i - 1]] = items[i]
-        elif items[i - 1] in ["-c", "-l", "-g", "-p", "-k", "-sa", "-i", "-sp"]:
+        elif items[i - 1] in [
+            "-n",
+            "-up",
+            "-rcf",
+            "-au",
+            "-ap",
+            "-h",
+            "-t",
+            "-m",
+        ] or items[i - 1] in ["-c", "-l", "-g", "-p", "-k", "-sa", "-i", "-sp"]:
             arg_base[items[i - 1]] = items[i]
     return arg_base
 

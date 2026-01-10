@@ -139,6 +139,7 @@ def get_poster(query):
         LOGGER.error(f"Error fetching IMDB data for {query}: {e}")
         return None
 
+
 def get_tmdb_result(query, api_key, thumb_format="poster"):
     if not query or not api_key:
         return None
@@ -159,7 +160,9 @@ def get_tmdb_result(query, api_key, thumb_format="poster"):
         id_ = result.get("id")
 
         # Get details
-        details_url = f"https://api.themoviedb.org/3/{media_type}/{id_}?api_key={api_key}"
+        details_url = (
+            f"https://api.themoviedb.org/3/{media_type}/{id_}?api_key={api_key}"
+        )
         response = requests.get(details_url, timeout=10)
         if response.status_code != 200:
             return None
@@ -180,7 +183,7 @@ def get_tmdb_result(query, api_key, thumb_format="poster"):
             image_url = f"https://image.tmdb.org/t/p/original{backdrop_path}"
         elif poster_path:
             image_url = f"https://image.tmdb.org/t/p/original{poster_path}"
-        elif backdrop_path: # Fallback
+        elif backdrop_path:  # Fallback
             image_url = f"https://image.tmdb.org/t/p/original{backdrop_path}"
 
         return {
@@ -188,7 +191,7 @@ def get_tmdb_result(query, api_key, thumb_format="poster"):
             "year": year,
             "rating": str(rating),
             "genres": genres,
-            "poster": image_url
+            "poster": image_url,
         }
     except Exception as e:
         LOGGER.error(f"TMDB error: {e}")

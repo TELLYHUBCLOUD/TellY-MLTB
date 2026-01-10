@@ -1,12 +1,12 @@
 from asyncio import sleep
 from html import escape
-from re import search as re_search
+from time import time
 
-from aiofiles.os import listdir, path as aiopath
+from aiofiles.os import listdir
+from aiofiles.os import path as aiopath
 from aioshutil import rmtree
 
 from bot import (
-    DOWNLOAD_DIR,
     LOGGER,
     Config,
     non_queued_dl,
@@ -15,16 +15,17 @@ from bot import (
     task_dict_lock,
 )
 from bot.helper.common import TaskConfig
-from bot.helper.ext_utils.bot_utils import sync_to_async
 from bot.helper.ext_utils.files_utils import (
     get_path_size,
     join_files,
     remove_excluded_files,
     remove_non_included_files,
 )
-from bot.helper.ext_utils.links_utils import is_gdrive_id
-from bot.helper.ext_utils.status_utils import get_readable_file_size, get_readable_time
-from bot.helper.ext_utils.task_manager import check_running_tasks, start_from_queued
+from bot.helper.ext_utils.status_utils import (
+    get_readable_file_size,
+    get_readable_time,
+)
+from bot.helper.ext_utils.task_manager import start_from_queued
 from bot.helper.mirror_leech_utils.gdrive_utils.upload import GoogleDriveUpload
 from bot.helper.mirror_leech_utils.gofile_utils.upload import GoFileUpload
 from bot.helper.mirror_leech_utils.rclone_utils.transfer import RcloneTransferHelper
@@ -32,7 +33,6 @@ from bot.helper.mirror_leech_utils.status_utils.gdrive_status import (
     GoogleDriveStatus,
 )
 from bot.helper.mirror_leech_utils.status_utils.gofile_status import GoFileStatus
-from bot.helper.mirror_leech_utils.status_utils.queue_status import QueueStatus
 from bot.helper.mirror_leech_utils.status_utils.rclone_status import RcloneStatus
 from bot.helper.mirror_leech_utils.status_utils.telegram_status import TelegramStatus
 from bot.helper.mirror_leech_utils.telegram_uploader import TelegramUploader
@@ -41,7 +41,6 @@ from bot.helper.telegram_helper.message_utils import (
     delete_message,
     send_message,
 )
-from time import time
 
 
 class TaskListener(TaskConfig):
@@ -174,7 +173,12 @@ class TaskListener(TaskConfig):
             else:
                 await remove_non_included_files(up_dir, self.included_extensions)
 
-        if self.merge_video or self.merge_audio or self.merge_subtitle or self.merge_image:
+        if (
+            self.merge_video
+            or self.merge_audio
+            or self.merge_subtitle
+            or self.merge_image
+        ):
             up_path = await self.proceed_merge(up_path, self.mid)
             if self.is_cancelled:
                 return

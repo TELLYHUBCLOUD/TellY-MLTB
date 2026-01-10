@@ -1,4 +1,3 @@
-import asyncio
 from asyncio import sleep
 from functools import partial
 from threading import Lock
@@ -10,26 +9,18 @@ from pyrogram.handlers import MessageHandler
 
 from bot import (
     LOGGER,
-    bot_loop,
-    job_queue,
     rss_dict,
     scheduler,
 )
 from bot.core.config_manager import Config
-from bot.core.telegram_manager import TgClient
 from bot.helper.ext_utils.bot_utils import new_task
 from bot.helper.ext_utils.db_handler import database
-from bot.helper.ext_utils.exceptions import RssShutdownException
-from bot.helper.ext_utils.help_messages import RSS_HELP_MESSAGE
-from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.telegram_helper.filters import CustomFilters
 from bot.helper.telegram_helper.message_utils import (
     edit_message,
     send_message,
-    send_rss,
 )
-from bot.modules.mirror_leech import MirrorLeech
 
 rss_dict_lock = Lock()
 handler_dict = {}
@@ -43,7 +34,6 @@ async def rss_sub(_, message, pre_event):
     else:
         tag = message.from_user.mention
 
-    msg = ""
     items = message.text.split("\n")
     for item in items:
         args = item.split()
@@ -72,12 +62,7 @@ async def rss_sub(_, message, pre_event):
         stv = False
 
         if len(args) > 2:
-            arg_dict = {
-                "-inf": "",
-                "-exf": "",
-                "-c": "",
-                "-stv": "false",
-            }
+            pass
             # Simplified args parsing for RSS
             # ...
 
@@ -105,7 +90,7 @@ async def rss_sub(_, message, pre_event):
                         "command": cmd,
                         "sensitive": stv,
                         "tag": tag,
-                    }
+                    },
                 }
             LOGGER.info(
                 f"Rss Feed Added: id: {user_id} - title: {title} - link: {feed_link} - c: {cmd} - inf: {inf} - exf: {exf} - stv: {stv}"
@@ -128,20 +113,22 @@ async def rss_list(query, start, all_users=False):
     user_id = query.from_user.id
     buttons = ButtonMaker()
     if all_users:
-        list_feed = f"<b>All RSS Subscriptions:</b>\n\n"
+        list_feed = "<b>All RSS Subscriptions:</b>\n\n"
     else:
-        list_feed = f"<b>Your RSS Subscriptions:</b>\n\n"
+        list_feed = "<b>Your RSS Subscriptions:</b>\n\n"
 
     async with rss_dict_lock:
         if user_id in rss_dict:
             keysCount = len(rss_dict[user_id])
-            for index, (title, data) in enumerate(
+            for _index, (title, data) in enumerate(
                 list(rss_dict[user_id].items())[start : 5 + start]
             ):
                 list_feed += f"\n\n<b>Title:</b> <code>{title}</code>\n"
                 list_feed += f"<b>Feed Url:</b> <code>{data['link']}</code>\n"
                 list_feed += f"<b>Paused:</b> <code>{data['paused']}</code>\n"
-                list_feed += f"<b>Command:</b> <code>{data['filters']['command']}</code>\n"
+                list_feed += (
+                    f"<b>Command:</b> <code>{data['filters']['command']}</code>\n"
+                )
 
     if keysCount > 5:
         for x in range(0, keysCount, 5):
@@ -189,7 +176,7 @@ async def rss_get(_, message, pre_event):
                 item_count = 0
                 while item_count < count:
                     try:
-                        item = rss_d.entries[item_count]
+                        rss_d.entries[item_count]
                         # Process item similar to monitor logic...
                         # Placeholder logic
                         item_count += 1
@@ -197,9 +184,7 @@ async def rss_get(_, message, pre_event):
                         break
             except Exception as e:
                 LOGGER.error(str(e))
-                await edit_message(
-                    msg, f"Error getting items: {e}"
-                )
+                await edit_message(msg, f"Error getting items: {e}")
         else:
             await send_message(message, "Feed not found or count is invalid!")
 

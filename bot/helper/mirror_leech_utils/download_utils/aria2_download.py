@@ -1,12 +1,11 @@
-from asyncio import sleep
-
 from bot import LOGGER, aria2_options, task_dict, task_dict_lock
 from bot.core.config_manager import Config
-from bot.helper.ext_utils.bot_utils import new_task
-from bot.helper.ext_utils.task_manager import check_running_tasks, stop_duplicate_check
+from bot.helper.ext_utils.task_manager import (
+    check_running_tasks,
+    stop_duplicate_check,
+)
 from bot.helper.mirror_leech_utils.status_utils.aria2_status import Aria2Status
 from bot.helper.telegram_helper.message_utils import (
-    delete_message,
     send_message,
     send_status_message,
 )
@@ -77,6 +76,4 @@ async def add_aria2_download(listener, dpath, header, ratio, seed_time):
 
 
 def is_metadata(download):
-    if download.get("followedBy"):
-        return True
-    return False
+    return bool(download.get("followedBy"))

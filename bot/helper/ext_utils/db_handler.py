@@ -4,7 +4,6 @@ from pymongo.server_api import ServerApi
 
 from bot import LOGGER, qbit_options, rss_dict, user_data
 from bot.core.config_manager import Config
-from bot.core.telegram_manager import TgClient
 
 
 class DbManager:
@@ -63,7 +62,6 @@ class DbManager:
         if self._err or self._return:
             return
         # Implement update nzb config logic here
-        pass
 
     async def update_private_file(self, path):
         if self._err or self._return:
@@ -176,13 +174,11 @@ class DbManager:
         if data:
             del data["_id"]
             # Implementation to update global aria2 options would go here
-            pass
 
     async def load_nzb_config(self):
         if self._err or self._return:
             return
         # Implementation to load nzb config
-        pass
 
     async def load_aria2_config(self):
         await self.update_aria2_config()

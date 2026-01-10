@@ -1,15 +1,9 @@
-import asyncio
 from logging import getLogger
 
-from bot import LOGGER, task_dict_lock
-from bot.core.telegram_manager import TgClient
+from bot import LOGGER
 from bot.helper.ext_utils.bot_utils import arg_parser, new_task
-from bot.helper.ext_utils.task_manager import check_running_tasks, stop_duplicate_check
 from bot.helper.listeners.task_listener import TaskListener
-from bot.helper.mirror_leech_utils.download_utils.yt_dlp_download import YtDlpDownload
 from bot.helper.telegram_helper.message_utils import (
-    delete_message,
-    edit_message,
     send_message,
 )
 
@@ -133,10 +127,9 @@ class YtDlp(TaskListener):
                 bulk_end = dargs[1] or "0"
             is_bulk = True
 
-        if not is_bulk:
-            if self.multi > 0:
-                await self.run_multi(input_list, YtDlp)
-                return
+        if not is_bulk and self.multi > 0:
+            await self.run_multi(input_list, YtDlp)
+            return
 
         await self.get_tag(text)
 
@@ -161,4 +154,3 @@ class YtDlp(TaskListener):
             return
 
         # YtDlp Download Logic
-        pass

@@ -1,21 +1,10 @@
 import contextlib
-from asyncio import create_subprocess_exec, gather, wait_for
+from asyncio import create_subprocess_exec
 from asyncio.subprocess import PIPE
-from configparser import RawConfigParser
-from json import loads
 from logging import getLogger
-from os import path as ospath
-from random import randrange
-from re import findall
-from time import time
 
-from aiofiles.os import path as aiopath
-
-from bot import LOGGER, task_dict_lock
+from bot import LOGGER
 from bot.core.config_manager import Config
-from bot.helper.ext_utils.bot_utils import cmd_exec, new_task
-from bot.helper.ext_utils.files_utils import count_files_and_folders, get_mime_type
-from bot.helper.ext_utils.status_utils import get_readable_file_size
 
 LOGGER = getLogger(__name__)
 
@@ -161,9 +150,7 @@ class RcloneTransferHelper:
     async def cancel_task(self):
         self._is_cancelled = True
         if self._proc:
-            try:
+            with contextlib.suppress(Exception):
                 self._proc.kill()
-            except Exception:
-                pass
         LOGGER.info(f"Cancelling Rclone Upload: {self.listener.name}")
         await self.listener.on_upload_error("Your Rclone Upload has been stopped!")

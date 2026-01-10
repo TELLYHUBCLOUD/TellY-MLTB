@@ -1,16 +1,9 @@
 from asyncio import sleep
 
-from bot import multi_tags, task_dict, task_dict_lock, user_data
-from bot.core.config_manager import Config
+from bot import multi_tags, task_dict, task_dict_lock
 from bot.helper.ext_utils.bot_utils import new_task
-from bot.helper.ext_utils.status_utils import (
-    MirrorStatus,
-    get_readable_message,
-)
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.message_utils import (
-    auto_delete_message,
-    delete_message,
     send_message,
 )
 
@@ -24,11 +17,10 @@ async def cancel_task(_, message):
         if len(gid) == 4:
             multi_tags.discard(gid)
             return
-        else:
-            task = await get_task_by_gid(gid)
-            if task is None:
-                await send_message(message, f"GID: {gid} Not Found.")
-                return
+        task = await get_task_by_gid(gid)
+        if task is None:
+            await send_message(message, f"GID: {gid} Not Found.")
+            return
     elif reply_to_id := message.reply_to_message_id:
         async with task_dict_lock:
             task = task_dict.get(reply_to_id)
@@ -39,9 +31,8 @@ async def cancel_task(_, message):
         msg = f"Reply to an active Command message which was used to start the download or send <code>/{BotCommands.CancelTaskCommand} GID</code> to cancel it!"
         await send_message(message, msg)
         return
-    if (
-        user_id != task.listener.user_id
-        and not await CustomFilters.sudo("", message)
+    if user_id != task.listener.user_id and not await CustomFilters.sudo(
+        "", message
     ):
         await send_message(message, "This task is not for you!")
         return
@@ -58,11 +49,10 @@ async def cancel_multi(_, message):
         if len(gid) == 4:
             multi_tags.discard(gid)
             return
-        else:
-            task = await get_task_by_gid(gid)
-            if task is None:
-                await send_message(message, f"GID: {gid} Not Found.")
-                return
+        task = await get_task_by_gid(gid)
+        if task is None:
+            await send_message(message, f"GID: {gid} Not Found.")
+            return
     elif reply_to_id := message.reply_to_message_id:
         async with task_dict_lock:
             task = task_dict.get(reply_to_id)
@@ -73,9 +63,8 @@ async def cancel_multi(_, message):
         msg = f"Reply to an active Command message which was used to start the download or send <code>/{BotCommands.CancelMultiCommand} GID</code> to cancel it!"
         await send_message(message, msg)
         return
-    if (
-        user_id != task.listener.user_id
-        and not await CustomFilters.sudo("", message)
+    if user_id != task.listener.user_id and not await CustomFilters.sudo(
+        "", message
     ):
         await send_message(message, "This task is not for you!")
         return

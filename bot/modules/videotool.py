@@ -76,7 +76,7 @@ async def select_encode_options(_, query, obj):
     elif data[1] == "mux_vs":
         await obj.get_text_input("mux_vs")
     elif data[1] == "extract":
-        await obj.streams_subbuttons() # Extract uses stream selection for now
+        await obj.streams_subbuttons()  # Extract uses stream selection for now
     elif data[1] == "remove_stream":
         await obj.streams_subbuttons()
     elif data[1] == "toggle_audio":
@@ -279,7 +279,7 @@ class EncodeSelection:
             elif action == "subsync":
                 self.listener.mode = f"sync_{text}"
             elif action.startswith("mux_"):
-                self.listener.options = f"mux:{text}" # placeholder for mux logic
+                self.listener.options = f"mux:{text}"  # placeholder for mux logic
         except:
             pass
         finally:

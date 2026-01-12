@@ -69,6 +69,14 @@ async def select_encode_options(_, query, obj):
         await obj.get_text_input("watermark")
     elif data[1] == "subsync":
         await obj.get_text_input("subsync")
+    elif data[1] == "mux_vv":
+        await obj.get_text_input("mux_vv")
+    elif data[1] == "mux_va":
+        await obj.get_text_input("mux_va")
+    elif data[1] == "mux_vs":
+        await obj.get_text_input("mux_vs")
+    elif data[1] == "extract":
+        await obj.streams_subbuttons() # Extract uses stream selection for now
     elif data[1] == "remove_stream":
         await obj.streams_subbuttons()
     elif data[1] == "toggle_audio":
@@ -139,8 +147,34 @@ class EncodeSelection:
         return self.quality, self.audio_map, self.sub_map
 
     async def main_menu(self):
-        # Already updated in previous call, ensuring context
-        pass
+        buttons = ButtonMaker()
+        buttons.data_button("Rename", "enc rename")
+        buttons.data_button("Video + Video", "enc mux_vv")
+        buttons.data_button("Video + Audio", "enc mux_va")
+        buttons.data_button("Video + Subtitle", "enc mux_vs")
+        buttons.data_button("SubSync", "enc subsync")
+        buttons.data_button("Compress", "enc compress")
+        buttons.data_button("Convert", "enc convert")
+        buttons.data_button("Watermark", "enc watermark")
+        buttons.data_button("Extract", "enc extract")
+        buttons.data_button("Trim", "enc trim")
+        buttons.data_button("Remove Stream", "enc remove_stream")
+
+        buttons.data_button("Done", "enc done")
+        buttons.data_button("Cancel", "enc cancel")
+
+        msg_text = (
+            f"<b>Video Tool Settings</b>\n"
+            f"Quality: {self.quality}\n"
+            f"Timeout: {get_readable_time(self._timeout - (time() - self._start_time))}\n"
+        )
+        markup = buttons.build_menu(2)
+        if not self._reply_to:
+            self._reply_to = await send_message(
+                self.listener.message, msg_text, markup
+            )
+        else:
+            await edit_message(self._reply_to, msg_text, markup)
 
     async def compress_subbuttons(self):
         buttons = ButtonMaker()
@@ -212,6 +246,9 @@ class EncodeSelection:
             "trim": "Send trim time (format: 00:00:05-00:00:10):",
             "watermark": "Send the text for the watermark:",
             "subsync": "Send the sync offset (e.g. 2.5 or -1.2):",
+            "mux_vv": "Send the Telegram link or reply to the second Video file:",
+            "mux_va": "Send the Telegram link or reply to the Audio file:",
+            "mux_vs": "Send the Telegram link or reply to the Subtitle file:",
         }.get(action, "Send input:")
 
         await edit_message(self._reply_to, prompt)
@@ -241,59 +278,13 @@ class EncodeSelection:
                 self.listener.watermark_text = text
             elif action == "subsync":
                 self.listener.mode = f"sync_{text}"
+            elif action.startswith("mux_"):
+                self.listener.options = f"mux:{text}" # placeholder for mux logic
         except:
             pass
         finally:
             self.listener.client.remove_handler(*handler)
         await self.main_menu()
-        buttons = ButtonMaker()
-        buttons.data_button("Rename", "enc rename")
-        buttons.data_button("Video + Video", "enc mux_vv")
-        buttons.data_button("Video + Audio", "enc mux_va")
-        buttons.data_button("Video + Subtitle", "enc mux_vs")
-        buttons.data_button("SubSync", "enc subsync")
-        buttons.data_button("Compress", "enc compress")
-        buttons.data_button("Convert", "enc convert")
-        buttons.data_button("Watermark", "enc watermark")
-        buttons.data_button("Extract", "enc extract")
-        buttons.data_button("Trim", "enc trim")
-        buttons.data_button("Remove Stream", "enc remove_stream")
-
-        buttons.data_button("Done", "enc done")
-        buttons.data_button("Cancel", "enc cancel")
-
-        msg_text = (
-            f"<b>Video Tool Settings</b>\n"
-            f"Quality: {self.quality}\n"
-            f"Timeout: {get_readable_time(self._timeout - (time() - self._start_time))}\n"
-        )
-        markup = buttons.build_menu(2)
-        if not self._reply_to:
-            self._reply_to = await send_message(
-                self.listener.message, msg_text, markup
-            )
-        else:
-            await edit_message(self._reply_to, msg_text, markup)
-
-    async def compress_subbuttons(self):
-        buttons = ButtonMaker()
-        options = [
-            "Original",
-            "1080p",
-            "720p",
-            "576p",
-            "480p",
-            "360p",
-            "240p",
-            "144p",
-        ]
-        for opt in options:
-            prefix = "✅ " if self.quality == opt else ""
-            buttons.data_button(f"{prefix}{opt}", f"enc qual {opt}")
-
-        buttons.data_button("Back", "enc done")
-        markup = buttons.build_menu(2)
-        await edit_message(self._reply_to, "Select Quality", markup)
 
 
 class Encode(TaskListener):

@@ -1,4 +1,6 @@
 import json
+from pyrogram.filters import regex, user
+from pyrogram.handlers import CallbackQueryHandler
 from asyncio import Event, create_task, wait_for
 from functools import partial
 from os import makedirs, walk
@@ -367,7 +369,7 @@ class Encode(TaskListener):
                         LOGGER.error(f"Error fetching TG metadata: {e}")
                     finally:
                         if await aiopath.exists(des_path):
-                            await aioremove(des_path)
+                            await remove(des_path)
 
             if streams:
                 self.has_metadata_selection = True

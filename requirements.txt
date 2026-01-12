@@ -5,11 +5,11 @@ anytree
 apscheduler
 aioaria2
 aioqbt
-beautifulsoup4
 cloudscraper
 dnspython
 ElectroCrypto
 kurigram
+motor
 fastapi
 feedparser
 google-api-python-client
@@ -21,6 +21,8 @@ jinja2
 langcodes
 lxml
 natsort
+beautifulsoup4
+python-dotenv
 pillow
 psutil
 pymongo
@@ -36,5 +38,6 @@ tenacity
 uvicorn
 uvloop
 xattr
+pycountry
+urllib3
 yt-dlp[default,curl-cffi]
-python-dotenv

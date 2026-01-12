@@ -1,3 +1,4 @@
+from asyncio import new_event_loop, set_event_loop
 from logging import (
     FileHandler,
     Formatter,
@@ -9,7 +10,6 @@ from logging import (
 from os import cpu_count, makedirs, path
 from socket import gethostname
 
-from asyncio import new_event_loop, set_event_loop
 from dotenv import load_dotenv
 from uvloop import install
 

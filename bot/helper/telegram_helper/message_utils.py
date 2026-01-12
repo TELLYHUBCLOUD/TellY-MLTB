@@ -37,6 +37,8 @@ async def send_message(
     markdown=False,
     block=True,
 ):
+    if not message:
+        return None
     parse_mode = enums.ParseMode.MARKDOWN if markdown else enums.ParseMode.HTML
     try:
         if isinstance(message, int):
@@ -73,7 +75,7 @@ async def send_message(
         return await send_message(message, text, buttons, photo, markdown)
     except Exception as e:
         LOGGER.error(str(e))
-        return str(e)
+        return None
 
 
 async def edit_message(
@@ -84,6 +86,8 @@ async def edit_message(
     markdown=False,
     block=True,
 ):
+    if not message:
+        return None
     # parse_mode = enums.ParseMode.MARKDOWN if markdown else enums.ParseMode.HTML
     try:
         if message.media:

@@ -66,6 +66,8 @@ class Merge(TaskListener):
 
         arg_parser(input_list[1:], args)
 
+        await self.get_tag(text)
+
         self.link = args["link"]
         self.name = ""
         self.output_name = args["-n"]

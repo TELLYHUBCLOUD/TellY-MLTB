@@ -56,23 +56,38 @@ async def select_encode_options(_, query, obj):
 
     if data[1] == "compress":
         await obj.compress_subbuttons()
+    elif data[1] == "convert":
+        await obj.convert_subbuttons()
     elif data[1] == "qual":
         obj.quality = data[2]
         await obj.main_menu()
+    elif data[1] == "conv_ext":
+        obj.mode = data[2]
+        await obj.main_menu()
+    elif data[1] == "rename":
+        await obj.get_text_input("rename")
+    elif data[1] == "trim":
+        await obj.get_text_input("trim")
+    elif data[1] == "watermark":
+        await obj.get_text_input("watermark")
+    elif data[1] == "subsync":
+        await obj.get_text_input("subsync")
+    elif data[1] == "remove_stream":
+        await obj.streams_subbuttons()
     elif data[1] == "toggle_audio":
         index = int(data[2])
         if obj.streams:
             obj.audio_map[index] = not obj.audio_map[index]
         else:
             obj.remove_audio = not obj.remove_audio
-        await obj.main_menu()
+        await obj.streams_subbuttons()
     elif data[1] == "toggle_sub":
         index = int(data[2])
         if obj.streams:
             obj.sub_map[index] = not obj.sub_map[index]
         else:
             obj.remove_subs = not obj.remove_subs
-        await obj.main_menu()
+        await obj.streams_subbuttons()
     elif data[1] == "cancel":
         await edit_message(message, "Task Cancelled.")
         obj.is_cancelled = True
@@ -104,10 +119,6 @@ class EncodeSelection:
                 elif stream["codec_type"] == "subtitle":
                     self.sub_map[stream["index"]] = True
 
-    @property
-    def is_timed_out(self):
-        return (time() - self._start_time) > self._timeout
-
     async def get_selection(self):
         await self.main_menu()
         pfunc = partial(select_encode_options, obj=self)
@@ -128,63 +139,121 @@ class EncodeSelection:
         if self.is_cancelled:
             return None, None, None
 
-        if self.streams:
-            return self.quality, self.audio_map, self.sub_map
-        return self.quality, self.remove_audio, self.remove_subs
+        return self.quality, self.audio_map, self.sub_map
 
     async def main_menu(self):
-        buttons = ButtonMaker()
-        buttons.data_button(f"Compress: {self.quality}", "enc compress")
+        # Already updated in previous call, ensuring context
+        pass
 
+    async def compress_subbuttons(self):
+        buttons = ButtonMaker()
+        options = ["Original", "1080p", "720p", "576p", "480p", "360p", "240p", "144p"]
+        for opt in options:
+            prefix = "✅ " if self.quality == opt else ""
+            buttons.data_button(f"{prefix}{opt}", f"enc qual {opt}")
+        buttons.data_button("Back", "enc done")
+        markup = buttons.build_menu(2)
+        await edit_message(self._reply_to, "Select Quality", markup)
+
+    async def convert_subbuttons(self):
+        buttons = ButtonMaker()
+        options = ["mp4", "mkv", "mov", "avi", "webm"]
+        for opt in options:
+            prefix = "✅ " if self.quality == opt else "" # using quality as storage for mode/ext
+            buttons.data_button(f"{prefix}{opt}", f"enc conv_ext {opt}")
+        buttons.data_button("Back", "enc done")
+        markup = buttons.build_menu(2)
+        await edit_message(self._reply_to, "Select Extension", markup)
+
+    async def streams_subbuttons(self):
+        buttons = ButtonMaker()
         if self.streams:
             for stream in self.streams:
-                if stream["codec_type"] == "audio":
-                    idx = stream["index"]
+                idx = stream["index"]
+                ctype = stream["codec_type"]
+                if ctype in ["audio", "subtitle"]:
                     lang = stream.get("tags", {}).get("language", "und")
-                    title = stream.get("tags", {}).get("title", "")
-                    label = f"{lang} ({stream.get('codec_name', 'unk')})"
-                    if title:
-                        label += f" - {title}"
-
-                    icon = "✅" if self.audio_map.get(idx, True) else "❌"
-                    buttons.data_button(
-                        f"{icon} Audio: {label}", f"enc toggle_audio {idx}"
-                    )
-
-            for stream in self.streams:
-                if stream["codec_type"] == "subtitle":
-                    idx = stream["index"]
-                    lang = stream.get("tags", {}).get("language", "und")
-                    title = stream.get("tags", {}).get("title", "")
-                    label = f"{lang} ({stream.get('codec_name', 'unk')})"
-                    if title:
-                        label += f" - {title}"
-
-                    icon = "✅" if self.sub_map.get(idx, True) else "❌"
-                    buttons.data_button(
-                        f"{icon} Sub: {label}", f"enc toggle_sub {idx}"
-                    )
+                    icon = "✅"
+                    if ctype == "audio":
+                        if not self.audio_map.get(idx, True): icon = "❌"
+                        btn_data = f"enc toggle_audio {idx}"
+                    else:
+                        if not self.sub_map.get(idx, True): icon = "❌"
+                        btn_data = f"enc toggle_sub {idx}"
+                    buttons.data_button(f"{icon} {ctype.capitalize()}: {lang}", btn_data)
         else:
             a_icon = "❌" if self.remove_audio else "✅"
             buttons.data_button(f"{a_icon} Audio (All)", "enc toggle_audio 0")
-
             s_icon = "❌" if self.remove_subs else "✅"
             buttons.data_button(f"{s_icon} Subs (All)", "enc toggle_sub 0")
 
+        buttons.data_button("Back", "enc done")
+        markup = buttons.build_menu(1)
+        await edit_message(self._reply_to, "Select Streams to Keep", markup)
+
+    async def get_text_input(self, action):
+        from pyrogram.handlers import MessageHandler
+        from pyrogram.filters import user
+        
+        prompt = {
+            "rename": "Send the new name for the file:",
+            "trim": "Send trim time (format: 00:00:05-00:00:10):",
+            "watermark": "Send the text for the watermark:",
+            "subsync": "Send the sync offset (e.g. 2.5 or -1.2):"
+        }.get(action, "Send input:")
+
+        await edit_message(self._reply_to, prompt)
+
+        user_input = Event()
+        result = [None]
+
+        async def func(_, msg):
+            result[0] = msg.text
+            user_input.set()
+            await delete_message(msg)
+
+        handler = self.listener.client.add_handler(
+            MessageHandler(func, filters=user(self.listener.user_id)),
+            group=-1
+        )
+        try:
+            await wait_for(user_input.wait(), timeout=30)
+            text = result[0]
+            if action == "rename": self.listener.new_name = text
+            elif action == "trim": 
+                if "-" in text:
+                    self.listener.trim_start, self.listener.trim_end = text.split("-")
+            elif action == "watermark": self.listener.watermark_text = text
+            elif action == "subsync": self.listener.mode = f"sync_{text}"
+        except:
+            pass
+        finally:
+            self.listener.client.remove_handler(*handler)
+        await self.main_menu()
+        buttons = ButtonMaker()
+        buttons.data_button("Rename", "enc rename")
+        buttons.data_button("Video + Video", "enc mux_vv")
+        buttons.data_button("Video + Audio", "enc mux_va")
+        buttons.data_button("Video + Subtitle", "enc mux_vs")
+        buttons.data_button("SubSync", "enc subsync")
+        buttons.data_button("Compress", "enc compress")
+        buttons.data_button("Convert", "enc convert")
+        buttons.data_button("Watermark", "enc watermark")
+        buttons.data_button("Extract", "enc extract")
+        buttons.data_button("Trim", "enc trim")
+        buttons.data_button("Remove Stream", "enc remove_stream")
+        
         buttons.data_button("Done", "enc done")
         buttons.data_button("Cancel", "enc cancel")
 
         msg_text = (
-            f"<b>Encode Settings</b>\n"
+            f"<b>Video Tool Settings</b>\n"
+            f"Quality: {self.quality}\n"
             f"Timeout: {get_readable_time(self._timeout - (time() - self._start_time))}\n"
         )
-
-        markup = buttons.build_menu(1)
-
+        markup = buttons.build_menu(2)
         if not self._reply_to:
-            self._reply_to = await send_message(
-                self.listener.message, msg_text, markup
-            )
+            self._reply_to = await send_message(self.listener.message, msg_text, markup)
         else:
             await edit_message(self._reply_to, msg_text, markup)
 
@@ -218,6 +287,11 @@ class Encode(TaskListener):
         self.remove_subs = False
         self.audio_map = {}
         self.sub_map = {}
+        self.mode = "Original" # renamed from quality in some contexts
+        self.trim_start = ""
+        self.trim_end = ""
+        self.watermark_text = ""
+        self.new_name = ""
         self.has_metadata_selection = False
         super().__init__()
         self.is_leech = True
@@ -249,6 +323,8 @@ class Encode(TaskListener):
         }
 
         arg_parser(input_list[1:], args)
+
+        await self.get_tag(text)
 
         self.link = args["link"]
         self.multi = args["-i"]
@@ -430,27 +506,11 @@ class Encode(TaskListener):
     async def on_download_complete(self):
         target_file = None
         max_size = 0
-        video_extensions = {
-            ".mp4",
-            ".mkv",
-            ".avi",
-            ".mov",
-            ".webm",
-            ".flv",
-            ".wmv",
-            ".ts",
-            ".m4v",
-            ".dat",
-            ".vob",
-            ".3gp",
-            ".mpeg",
-            ".mpg",
-        }
+        video_extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".ts", ".m4v", ".dat", ".vob", ".3gp", ".mpeg", ".mpg"}
 
         for root, _, files_list in await sync_to_async(walk, self.dir):
             for file_name in files_list:
-                if file_name.endswith((".aria2", ".!qB")):
-                    continue
+                if file_name.endswith((".aria2", ".!qB")): continue
                 ext = ospath.splitext(file_name)[1].lower()
                 if ext in video_extensions:
                     file_path = ospath.join(root, file_name)
@@ -466,118 +526,67 @@ class Encode(TaskListener):
         file_path = target_file
         ffmpeg = FFMpeg(self)
         async with task_dict_lock:
-            if self.mid in task_dict:
-                self.gid = task_dict[self.mid].gid()
-            task_dict[self.mid] = FFmpegStatus(self, ffmpeg, self.gid, "encoding")
+            if self.mid in task_dict: self.gid = task_dict[self.mid].gid()
+            task_dict[self.mid] = FFmpegStatus(self, ffmpeg, self.gid, "processing")
 
         await send_status_message(self.message)
 
-        cmd = [
-            "xtra",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-progress",
-            "pipe:1",
-            "-i",
-            file_path,
-        ]
+        # Build FFmpeg Command
+        cmd = ["xtra", "-hide_banner", "-loglevel", "error", "-progress", "pipe:1"]
+        
+        # Trim Logic
+        if self.trim_start: cmd.extend(["-ss", self.trim_start])
+        if self.trim_end: cmd.extend(["-to", self.trim_end])
+        
+        cmd.extend(["-i", file_path])
 
-        local_streams = []
-        if self.has_metadata_selection:
-            try:
-                result = await cmd_exec(
-                    [
-                        "ffprobe",
-                        "-hide_banner",
-                        "-loglevel",
-                        "error",
-                        "-print_format",
-                        "json",
-                        "-show_streams",
-                        file_path,
-                    ]
-                )
-                if result[0]:
-                    local_streams = json.loads(result[0]).get("streams", [])
-            except:
-                pass
+        # Video Filter Logic (Scale + Watermark)
+        vf = []
+        if self.quality != "Original" and self.quality not in ["mp4", "mkv", "mov", "avi", "webm"]:
+            if self.quality == "1080p": vf.append("scale=-2:1080")
+            elif self.quality == "720p": vf.append("scale=-2:720")
+            elif self.quality == "480p": vf.append("scale=-2:480")
+            elif self.quality == "360p": vf.append("scale=-2:360")
+        
+        if self.watermark_text:
+            vf.append(f"drawtext=text='{self.watermark_text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=24:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2")
 
-        if self.has_metadata_selection and local_streams:
-            for stream in local_streams:
-                idx = stream["index"]
-                ctype = stream["codec_type"]
-                if ctype == "video":
-                    cmd.extend(["-map", f"0:{idx}"])
-                elif ctype == "audio":
-                    if self.audio_map.get(idx, True):
-                        cmd.extend(["-map", f"0:{idx}"])
-                elif ctype == "subtitle":
-                    if self.sub_map.get(idx, True):
-                        cmd.extend(["-map", f"0:{idx}"])
-                else:
-                    cmd.extend(["-map", f"0:{idx}"])
-        else:
-            if self.remove_audio:
-                cmd.append("-an")
-            else:
-                cmd.extend(["-c:a", "copy"])
-            if self.remove_subs:
-                cmd.append("-sn")
-            else:
-                cmd.extend(["-c:s", "copy"])
-
-        if self.quality != "Original":
-            cmd.extend(["-c:v", "libx264"])
-            scale = ""
-            if self.quality == "1080p":
-                scale = "scale=-2:1080"
-            elif self.quality == "720p":
-                scale = "scale=-2:720"
-            elif self.quality == "576p":
-                scale = "scale=-2:576"
-            elif self.quality == "480p":
-                scale = "scale=-2:480"
-            elif self.quality == "360p":
-                scale = "scale=-2:360"
-            elif self.quality == "240p":
-                scale = "scale=-2:240"
-            elif self.quality == "144p":
-                scale = "scale=-2:144"
-            if scale:
-                cmd.extend(["-vf", scale])
+        if vf:
+            cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
         else:
             cmd.extend(["-c:v", "copy"])
 
+        # Mapping Streams
         if self.has_metadata_selection:
+            cmd.extend(["-map", "0:v"])
+            for idx, keep in self.audio_map.items():
+                if keep: cmd.extend(["-map", f"0:{idx}"])
+            for idx, keep in self.sub_map.items():
+                if keep: cmd.extend(["-map", f"0:{idx}"])
             cmd.extend(["-c:a", "copy", "-c:s", "copy"])
+        else:
+            if self.remove_audio: cmd.append("-an")
+            else: cmd.extend(["-c:a", "copy"])
+            if self.remove_subs: cmd.append("-sn")
+            else: cmd.extend(["-c:s", "copy"])
 
-        output_file = (
-            f"{ospath.splitext(file_path)[0]}_encoded{ospath.splitext(file_path)[1]}"
-        )
+        # Output Name
+        out_ext = self.mode if self.mode in ["mp4", "mkv", "mov", "avi", "webm"] else ospath.splitext(file_path)[1][1:]
+        out_name = self.new_name or f"{ospath.splitext(ospath.basename(file_path))[0]}_processed"
+        if not out_name.lower().endswith(f".{out_ext.lower()}"): out_name += f".{out_ext}"
+        
+        output_file = ospath.join(self.dir, out_name)
         cmd.append(output_file)
 
         res = await ffmpeg.metadata_watermark_cmds(cmd, file_path)
         if res:
             try:
-                if await aiopath.exists(file_path):
-                    await remove(file_path)
-                for f in await listdir(self.dir):
-                    if f.endswith((".aria2", ".!qB")):
-                        await remove(f"{self.dir}/{f}")
-                if await aiopath.exists(output_file):
-                    self.name = ospath.basename(output_file)
-                    new_path = f"{self.dir}/{self.name}"
-                    if ospath.dirname(output_file) != self.dir:
-                        await move(output_file, new_path)
-                else:
-                    await self.on_upload_error("Encoded file not found!")
-                    return
-            except Exception as e:
-                LOGGER.error(f"Error Cleanup: {e}")
+                if await aiopath.exists(file_path): await remove(file_path)
+                self.name = out_name
+            except Exception as e: LOGGER.error(f"Error Cleanup: {e}")
             await super().on_download_complete()
         else:
-            await self.on_upload_error("Encoding Failed.")
+            await self.on_upload_error("Video Processing Failed.")
 
 
 async def videotool(client, message):

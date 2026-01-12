@@ -88,7 +88,7 @@ DATABASE_URL = config_file.get("DATABASE_URL", "") or os.getenv("DATABASE_URL", 
 if DATABASE_URL:
     try:
         conn = MongoClient(DATABASE_URL, server_api=ServerApi("1"))
-        db = conn.luna
+        db = conn.tellyaeon
         config_dict = db.settings.config.find_one({"_id": BOT_ID})
         if config_dict is not None:
             config_file["UPSTREAM_REPO"] = config_dict.get(

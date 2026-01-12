@@ -15,7 +15,7 @@ from PIL import Image
 from bot import DOWNLOAD_DIR, LOGGER, cpu_no
 
 from .bot_utils import cmd_exec, sync_to_async
-from .files_utils import get_mime_type, is_archive, is_archive_split, get_path_size
+from .files_utils import get_mime_type, is_archive, is_archive_split
 from .status_utils import time_to_seconds
 
 

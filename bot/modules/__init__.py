@@ -12,7 +12,6 @@ from .gd_search import gdrive_search, select_type
 from .help import arg_usage, bot_help
 from .mediainfo import mediainfo
 from .merge import merge, merge_done, merge_session_handler
-from .videotool import videotool, select_encode_options
 from .mirror_leech import (
     jd_leech,
     jd_mirror,
@@ -40,6 +39,7 @@ from .users_settings import (
     get_users_settings,
     send_user_settings,
 )
+from .videotool import select_encode_options, videotool
 from .ytdlp import ytdl, ytdl_leech
 
 __all__ = [

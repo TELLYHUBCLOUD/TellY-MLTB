@@ -2,9 +2,12 @@
 Auto Leech/Mirror Processor
 Handles automatic processing of links and media files without manual commands
 """
+
 import copy
+
 from pyrogram import filters
 from pyrogram.types import Message
+
 from bot import LOGGER, user_data
 from bot.helper.ext_utils.links_utils import (
     is_magnet,
@@ -12,6 +15,8 @@ from bot.helper.ext_utils.links_utils import (
     is_url,
 )
 from bot.helper.telegram_helper.bot_commands import BotCommands
+
+
 class AutoProcessor:
     """
     Handles automatic processing of messages for auto leech/mirror functionality.
@@ -130,6 +135,7 @@ class AutoProcessor:
             is_leech: Whether to leech (True) or mirror (False)
         """
         from bot.modules.mirror_leech import Mirror
+
         command_name = (
             BotCommands.LeechCommand[0] if is_leech else BotCommands.MirrorCommand[0]
         )
@@ -160,6 +166,7 @@ class AutoProcessor:
             client, command_message, is_qbit=False, is_leech=is_leech
         )
         await mirror_task.new_event()
+
     @staticmethod
     async def _process_url(
         client, message: Message, url: str, is_leech: bool, force_ytdlp: bool = False
@@ -176,6 +183,7 @@ class AutoProcessor:
         """
         from bot.modules.mirror_leech import Mirror
         from bot.modules.ytdlp import YtDlp
+
         video_domains = [
             "youtube.",
             "youtu.be",
@@ -241,6 +249,8 @@ class AutoProcessor:
                 client, command_message, is_qbit=False, is_leech=is_leech
             )
             await mirror_task.new_event()
+
+
 def auto_message_filter(_, __, message: Message) -> bool:
     """
     Custom filter for automatic message processing.
@@ -312,4 +322,6 @@ def auto_message_filter(_, __, message: Message) -> bool:
                     return True
         return False
     return has_url or has_media
+
+
 auto_process_filter = filters.create(auto_message_filter)

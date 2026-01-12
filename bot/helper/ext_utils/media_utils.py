@@ -1,4 +1,5 @@
 import contextlib
+import json
 from asyncio import create_subprocess_exec, gather, sleep, wait_for
 from asyncio.subprocess import PIPE
 from os import path as ospath
@@ -14,7 +15,7 @@ from PIL import Image
 from bot import DOWNLOAD_DIR, LOGGER, cpu_no
 
 from .bot_utils import cmd_exec, sync_to_async
-from .files_utils import get_mime_type, is_archive, is_archive_split
+from .files_utils import get_mime_type, is_archive, is_archive_split, get_path_size
 from .status_utils import time_to_seconds
 
 
@@ -140,6 +141,91 @@ async def get_media_info(path, enhanced=False):
         title = tags.get("title") or tags.get("TITLE") or tags.get("Title")
         return duration, artist, title
     return 0, None, None
+
+
+async def get_codec_info(path):
+    try:
+        result = await cmd_exec(
+            [
+                "ffprobe",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-print_format",
+                "json",
+                "-show_streams",
+                path,
+            ],
+        )
+    except Exception as e:
+        LOGGER.error(f"Get Codec Info: {e}. File: {path}")
+        return []
+    if result[0] and result[2] == 0:
+        try:
+            data = eval(result[0])
+            return [s.get("codec_name") for s in data.get("streams", [])]
+        except Exception as e:
+            LOGGER.error(f"Error parsing codec info: {e}")
+            return []
+    return []
+
+
+async def get_streams(path):
+    try:
+        result = await cmd_exec(
+            [
+                "ffprobe",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-print_format",
+                "json",
+                "-show_streams",
+                path,
+            ],
+        )
+    except Exception as e:
+        LOGGER.error(f"Get Streams: {e}. File: {path}")
+        return []
+    if result[0] and result[2] == 0:
+        try:
+            data = json.loads(result[0])
+            return data.get("streams", [])
+        except Exception as e:
+            LOGGER.error(f"Error parsing streams: {e}")
+            return []
+    return []
+
+
+async def get_remote_media_info(url):
+    try:
+        result = await cmd_exec(
+            [
+                "ffprobe",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-print_format",
+                "json",
+                "-show_streams",
+                url,
+            ],
+        )
+    except Exception as e:
+        LOGGER.error(f"Get Remote Media Info: {e}. URL: {url}")
+        return []
+    if result[0] and result[2] == 0:
+        try:
+            data = json.loads(result[0])
+            return data.get("streams", [])
+        except Exception as e:
+            try:
+                data = eval(result[0])
+                return data.get("streams", [])
+            except:
+                LOGGER.error(f"Error parsing remote media info: {e}")
+                return []
+    return []
 
 
 async def get_document_type(path):
@@ -515,9 +601,12 @@ class FFMpeg:
                 await remove(op)
         return False
 
-    async def metadata_watermark_cmds(self, ffmpeg, f_path):
+    async def metadata_watermark_cmds(self, ffmpeg, f_path, total_duration=None):
         self.clear()
-        self._total_time = (await get_media_info(f_path))[0]
+        if total_duration:
+            self._total_time = total_duration
+        else:
+            self._total_time = (await get_media_info(f_path))[0]
         if self._listener.is_cancelled:
             return False
         self._listener.subproc = await create_subprocess_exec(

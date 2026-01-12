@@ -215,6 +215,21 @@ def add_handlers():
             BotCommands.SoxCommand,
             CustomFilters.authorized,
         ),
+        "merge": (
+            merge,
+            BotCommands.MergeCommand,
+            CustomFilters.authorized,
+        ),
+        "merge_done": (
+            merge_done,
+            BotCommands.MdoneCommand,
+            CustomFilters.authorized,
+        ),
+        "videotool": (
+            videotool,
+            BotCommands.VideoToolCommand,
+            CustomFilters.authorized,
+        ),
     }
 
     for handler_func, command_name, custom_filter in command_filters.values():
@@ -275,5 +290,17 @@ def add_handlers():
         MessageHandler(
             AutoProcessor.process_auto_message,
             filters=CustomFilters.authorized & auto_process_filter,
+        ),
+    )
+    TgClient.bot.add_handler(
+        MessageHandler(
+            merge_session_handler,
+            filters=CustomFilters.authorized,
+        ),
+    )
+    TgClient.bot.add_handler(
+        CallbackQueryHandler(
+            select_encode_options,
+            filters=regex("^enc") & CustomFilters.authorized,
         ),
     )

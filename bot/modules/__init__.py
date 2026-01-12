@@ -11,6 +11,8 @@ from .gd_delete import delete_file
 from .gd_search import gdrive_search, select_type
 from .help import arg_usage, bot_help
 from .mediainfo import mediainfo
+from .merge import merge, merge_done, merge_session_handler
+from .videotool import videotool, select_encode_options
 from .mirror_leech import (
     jd_leech,
     jd_mirror,
@@ -73,6 +75,9 @@ __all__ = [
     "leech",
     "log",
     "mediainfo",
+    "merge",
+    "merge_done",
+    "merge_session_handler",
     "mirror",
     "nzb_leech",
     "nzb_mirror",

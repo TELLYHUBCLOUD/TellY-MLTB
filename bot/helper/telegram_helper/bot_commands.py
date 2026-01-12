@@ -45,3 +45,6 @@ class BotCommands:
     SelectCommand = f"sel{i}"
     RssCommand = f"rss{i}"
     SoxCommand = [f"spectrum{i}", f"sox{i}"]
+    MergeCommand = [f"merge{i}", f"m{i}"]
+    MdoneCommand = [f"mdone{i}", f"md{i}"]
+    VideoToolCommand = [f"videotool{i}", f"vt{i}"]

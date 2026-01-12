@@ -89,6 +89,7 @@ __all__ = [
     "rss_listener",
     "run_shell",
     "select",
+    "select_encode_options",
     "select_type",
     "send_bot_settings",
     "send_user_settings",
@@ -101,7 +102,6 @@ __all__ = [
     "torrent_search_update",
     "unauthorize",
     "videotool",
-    "select_encode_options",
     "ytdl",
     "ytdl_leech",
 ]

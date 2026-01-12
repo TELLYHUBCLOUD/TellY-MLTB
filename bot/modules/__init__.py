@@ -100,6 +100,8 @@ __all__ = [
     "torrent_search",
     "torrent_search_update",
     "unauthorize",
+    "videotool",
+    "select_encode_options",
     "ytdl",
     "ytdl_leech",
 ]

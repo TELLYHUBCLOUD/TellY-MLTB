@@ -9,6 +9,7 @@ from logging import (
 from os import cpu_count, makedirs, path
 from socket import gethostname
 
+from asyncio import new_event_loop, set_event_loop
 from dotenv import load_dotenv
 from uvloop import install
 
@@ -77,7 +78,8 @@ cpu_eater_lock = None
 subprocess_lock = None
 same_directory_lock = None
 bot_start_time = 0
-bot_loop = None
+bot_loop = new_event_loop()
+set_event_loop(bot_loop)
 rss_dict = {}
 auth_chats = {}
 excluded_extensions = ["aria2", "!qB"]

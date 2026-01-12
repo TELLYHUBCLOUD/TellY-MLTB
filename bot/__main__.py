@@ -11,7 +11,6 @@ Config.load()
 SystemEnv.load()
 
 
-
 from .core.telegram_manager import TgClient
 from .helper.telegram_helper.bot_commands import BotCommands
 

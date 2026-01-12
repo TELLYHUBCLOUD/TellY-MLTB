@@ -21,7 +21,7 @@ class DbManager:
                 connectTimeoutMS=60000,
                 serverSelectionTimeoutMS=60000,
             )
-            self.db = self._conn.luna
+            self.db = self._conn.tellyaeon
             self._return = False
         except PyMongoError as e:
             LOGGER.error(f"Error in DB connection: {e}")

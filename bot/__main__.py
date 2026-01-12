@@ -10,9 +10,7 @@ LOGGER.info("Loading config...")
 Config.load()
 SystemEnv.load()
 
-from .core.startup import load_settings
 
-bot_loop.run_until_complete(load_settings())
 
 from .core.telegram_manager import TgClient
 from .helper.telegram_helper.bot_commands import BotCommands
@@ -64,7 +62,6 @@ async def set_commands():
 async def main():
     from .core.startup import (
         load_configurations,
-        save_settings,
         update_aria2_options,
         update_nzb_options,
         update_qb_options,
@@ -96,7 +93,6 @@ async def main():
         jdownloader.boot(),
     )
     await gather(
-        save_settings(),
         clean_all(),
         initiate_search_tools(),
         get_packages_version(),

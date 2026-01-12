@@ -20,10 +20,10 @@ from bot.helper.ext_utils.bot_utils import (
     new_task,
     sync_to_async,
 )
+from bot.helper.ext_utils.files_utils import get_path_size
 from bot.helper.ext_utils.links_utils import is_telegram_link, is_url
 from bot.helper.ext_utils.media_utils import (
     FFMpeg,
-    get_path_size,
     get_remote_media_info,
     get_streams,
 )

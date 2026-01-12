@@ -1,4 +1,3 @@
-import json
 from asyncio import Event, create_task, wait_for
 from functools import partial
 from os import makedirs, walk
@@ -7,9 +6,8 @@ from re import search as re_search
 from time import time
 
 from aiofiles import open as aiopen
-from aiofiles.os import listdir, remove
 from aiofiles.os import path as aiopath
-from aioshutil import move
+from aiofiles.os import remove
 from pyrogram.filters import regex, user
 from pyrogram.handlers import CallbackQueryHandler
 
@@ -18,7 +16,6 @@ from bot.core.aeon_client import TgClient
 from bot.helper.aeon_utils.access_check import error_check
 from bot.helper.ext_utils.bot_utils import (
     arg_parser,
-    cmd_exec,
     new_task,
     sync_to_async,
 )
@@ -147,7 +144,16 @@ class EncodeSelection:
 
     async def compress_subbuttons(self):
         buttons = ButtonMaker()
-        options = ["Original", "1080p", "720p", "576p", "480p", "360p", "240p", "144p"]
+        options = [
+            "Original",
+            "1080p",
+            "720p",
+            "576p",
+            "480p",
+            "360p",
+            "240p",
+            "144p",
+        ]
         for opt in options:
             prefix = "✅ " if self.quality == opt else ""
             buttons.data_button(f"{prefix}{opt}", f"enc qual {opt}")
@@ -159,7 +165,9 @@ class EncodeSelection:
         buttons = ButtonMaker()
         options = ["mp4", "mkv", "mov", "avi", "webm"]
         for opt in options:
-            prefix = "✅ " if self.quality == opt else "" # using quality as storage for mode/ext
+            prefix = (
+                "✅ " if self.quality == opt else ""
+            )  # using quality as storage for mode/ext
             buttons.data_button(f"{prefix}{opt}", f"enc conv_ext {opt}")
         buttons.data_button("Back", "enc done")
         markup = buttons.build_menu(2)
@@ -175,12 +183,16 @@ class EncodeSelection:
                     lang = stream.get("tags", {}).get("language", "und")
                     icon = "✅"
                     if ctype == "audio":
-                        if not self.audio_map.get(idx, True): icon = "❌"
+                        if not self.audio_map.get(idx, True):
+                            icon = "❌"
                         btn_data = f"enc toggle_audio {idx}"
                     else:
-                        if not self.sub_map.get(idx, True): icon = "❌"
+                        if not self.sub_map.get(idx, True):
+                            icon = "❌"
                         btn_data = f"enc toggle_sub {idx}"
-                    buttons.data_button(f"{icon} {ctype.capitalize()}: {lang}", btn_data)
+                    buttons.data_button(
+                        f"{icon} {ctype.capitalize()}: {lang}", btn_data
+                    )
         else:
             a_icon = "❌" if self.remove_audio else "✅"
             buttons.data_button(f"{a_icon} Audio (All)", "enc toggle_audio 0")
@@ -192,14 +204,14 @@ class EncodeSelection:
         await edit_message(self._reply_to, "Select Streams to Keep", markup)
 
     async def get_text_input(self, action):
-        from pyrogram.handlers import MessageHandler
         from pyrogram.filters import user
-        
+        from pyrogram.handlers import MessageHandler
+
         prompt = {
             "rename": "Send the new name for the file:",
             "trim": "Send trim time (format: 00:00:05-00:00:10):",
             "watermark": "Send the text for the watermark:",
-            "subsync": "Send the sync offset (e.g. 2.5 or -1.2):"
+            "subsync": "Send the sync offset (e.g. 2.5 or -1.2):",
         }.get(action, "Send input:")
 
         await edit_message(self._reply_to, prompt)
@@ -213,18 +225,22 @@ class EncodeSelection:
             await delete_message(msg)
 
         handler = self.listener.client.add_handler(
-            MessageHandler(func, filters=user(self.listener.user_id)),
-            group=-1
+            MessageHandler(func, filters=user(self.listener.user_id)), group=-1
         )
         try:
             await wait_for(user_input.wait(), timeout=30)
             text = result[0]
-            if action == "rename": self.listener.new_name = text
-            elif action == "trim": 
+            if action == "rename":
+                self.listener.new_name = text
+            elif action == "trim":
                 if "-" in text:
-                    self.listener.trim_start, self.listener.trim_end = text.split("-")
-            elif action == "watermark": self.listener.watermark_text = text
-            elif action == "subsync": self.listener.mode = f"sync_{text}"
+                    self.listener.trim_start, self.listener.trim_end = text.split(
+                        "-"
+                    )
+            elif action == "watermark":
+                self.listener.watermark_text = text
+            elif action == "subsync":
+                self.listener.mode = f"sync_{text}"
         except:
             pass
         finally:
@@ -242,7 +258,7 @@ class EncodeSelection:
         buttons.data_button("Extract", "enc extract")
         buttons.data_button("Trim", "enc trim")
         buttons.data_button("Remove Stream", "enc remove_stream")
-        
+
         buttons.data_button("Done", "enc done")
         buttons.data_button("Cancel", "enc cancel")
 
@@ -253,7 +269,9 @@ class EncodeSelection:
         )
         markup = buttons.build_menu(2)
         if not self._reply_to:
-            self._reply_to = await send_message(self.listener.message, msg_text, markup)
+            self._reply_to = await send_message(
+                self.listener.message, msg_text, markup
+            )
         else:
             await edit_message(self._reply_to, msg_text, markup)
 
@@ -287,7 +305,7 @@ class Encode(TaskListener):
         self.remove_subs = False
         self.audio_map = {}
         self.sub_map = {}
-        self.mode = "Original" # renamed from quality in some contexts
+        self.mode = "Original"  # renamed from quality in some contexts
         self.trim_start = ""
         self.trim_end = ""
         self.watermark_text = ""
@@ -506,11 +524,27 @@ class Encode(TaskListener):
     async def on_download_complete(self):
         target_file = None
         max_size = 0
-        video_extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".ts", ".m4v", ".dat", ".vob", ".3gp", ".mpeg", ".mpg"}
+        video_extensions = {
+            ".mp4",
+            ".mkv",
+            ".avi",
+            ".mov",
+            ".webm",
+            ".flv",
+            ".wmv",
+            ".ts",
+            ".m4v",
+            ".dat",
+            ".vob",
+            ".3gp",
+            ".mpeg",
+            ".mpg",
+        }
 
         for root, _, files_list in await sync_to_async(walk, self.dir):
             for file_name in files_list:
-                if file_name.endswith((".aria2", ".!qB")): continue
+                if file_name.endswith((".aria2", ".!qB")):
+                    continue
                 ext = ospath.splitext(file_name)[1].lower()
                 if ext in video_extensions:
                     file_path = ospath.join(root, file_name)
@@ -526,30 +560,45 @@ class Encode(TaskListener):
         file_path = target_file
         ffmpeg = FFMpeg(self)
         async with task_dict_lock:
-            if self.mid in task_dict: self.gid = task_dict[self.mid].gid()
+            if self.mid in task_dict:
+                self.gid = task_dict[self.mid].gid()
             task_dict[self.mid] = FFmpegStatus(self, ffmpeg, self.gid, "processing")
 
         await send_status_message(self.message)
 
         # Build FFmpeg Command
         cmd = ["xtra", "-hide_banner", "-loglevel", "error", "-progress", "pipe:1"]
-        
+
         # Trim Logic
-        if self.trim_start: cmd.extend(["-ss", self.trim_start])
-        if self.trim_end: cmd.extend(["-to", self.trim_end])
-        
+        if self.trim_start:
+            cmd.extend(["-ss", self.trim_start])
+        if self.trim_end:
+            cmd.extend(["-to", self.trim_end])
+
         cmd.extend(["-i", file_path])
 
         # Video Filter Logic (Scale + Watermark)
         vf = []
-        if self.quality != "Original" and self.quality not in ["mp4", "mkv", "mov", "avi", "webm"]:
-            if self.quality == "1080p": vf.append("scale=-2:1080")
-            elif self.quality == "720p": vf.append("scale=-2:720")
-            elif self.quality == "480p": vf.append("scale=-2:480")
-            elif self.quality == "360p": vf.append("scale=-2:360")
-        
+        if self.quality != "Original" and self.quality not in [
+            "mp4",
+            "mkv",
+            "mov",
+            "avi",
+            "webm",
+        ]:
+            if self.quality == "1080p":
+                vf.append("scale=-2:1080")
+            elif self.quality == "720p":
+                vf.append("scale=-2:720")
+            elif self.quality == "480p":
+                vf.append("scale=-2:480")
+            elif self.quality == "360p":
+                vf.append("scale=-2:360")
+
         if self.watermark_text:
-            vf.append(f"drawtext=text='{self.watermark_text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=24:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2")
+            vf.append(
+                f"drawtext=text='{self.watermark_text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=24:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2"
+            )
 
         if vf:
             cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
@@ -560,30 +609,46 @@ class Encode(TaskListener):
         if self.has_metadata_selection:
             cmd.extend(["-map", "0:v"])
             for idx, keep in self.audio_map.items():
-                if keep: cmd.extend(["-map", f"0:{idx}"])
+                if keep:
+                    cmd.extend(["-map", f"0:{idx}"])
             for idx, keep in self.sub_map.items():
-                if keep: cmd.extend(["-map", f"0:{idx}"])
+                if keep:
+                    cmd.extend(["-map", f"0:{idx}"])
             cmd.extend(["-c:a", "copy", "-c:s", "copy"])
         else:
-            if self.remove_audio: cmd.append("-an")
-            else: cmd.extend(["-c:a", "copy"])
-            if self.remove_subs: cmd.append("-sn")
-            else: cmd.extend(["-c:s", "copy"])
+            if self.remove_audio:
+                cmd.append("-an")
+            else:
+                cmd.extend(["-c:a", "copy"])
+            if self.remove_subs:
+                cmd.append("-sn")
+            else:
+                cmd.extend(["-c:s", "copy"])
 
         # Output Name
-        out_ext = self.mode if self.mode in ["mp4", "mkv", "mov", "avi", "webm"] else ospath.splitext(file_path)[1][1:]
-        out_name = self.new_name or f"{ospath.splitext(ospath.basename(file_path))[0]}_processed"
-        if not out_name.lower().endswith(f".{out_ext.lower()}"): out_name += f".{out_ext}"
-        
+        out_ext = (
+            self.mode
+            if self.mode in ["mp4", "mkv", "mov", "avi", "webm"]
+            else ospath.splitext(file_path)[1][1:]
+        )
+        out_name = (
+            self.new_name
+            or f"{ospath.splitext(ospath.basename(file_path))[0]}_processed"
+        )
+        if not out_name.lower().endswith(f".{out_ext.lower()}"):
+            out_name += f".{out_ext}"
+
         output_file = ospath.join(self.dir, out_name)
         cmd.append(output_file)
 
         res = await ffmpeg.metadata_watermark_cmds(cmd, file_path)
         if res:
             try:
-                if await aiopath.exists(file_path): await remove(file_path)
+                if await aiopath.exists(file_path):
+                    await remove(file_path)
                 self.name = out_name
-            except Exception as e: LOGGER.error(f"Error Cleanup: {e}")
+            except Exception as e:
+                LOGGER.error(f"Error Cleanup: {e}")
             await super().on_download_complete()
         else:
             await self.on_upload_error("Video Processing Failed.")

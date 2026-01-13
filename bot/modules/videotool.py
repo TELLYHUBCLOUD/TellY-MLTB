@@ -274,7 +274,13 @@ class EncodeSelection:
         result = [None]
 
         async def func(_, msg):
-            result[0] = msg.text
+            if msg.text:
+                result[0] = msg.text
+            elif msg.link:
+                result[0] = msg.link
+            elif msg.reply_to_message:
+                result[0] = msg.reply_to_message.link
+
             user_input.set()
             await delete_message(msg)
 

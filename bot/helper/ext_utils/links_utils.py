@@ -32,7 +32,12 @@ def is_gdrive_link(url: str):
 def is_telegram_link(url: str):
     if not url or not isinstance(url, str):
         return False
-    return url.startswith(("https://t.me/", "tg://openmessage?user_id="))
+    return bool(
+        re_match(
+            r"^(https?:\/\/)?(www\.)?(t\.me|telegram\.me|tg:\/\/openmessage\?user_id=)",
+            url,
+        )
+    )
 
 
 def is_share_link(url: str):

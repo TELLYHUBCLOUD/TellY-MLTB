@@ -578,13 +578,15 @@ class Encode(TaskListener):
             await sync_to_async(makedirs, mux_path, exist_ok=True)
             if is_telegram_link(self.mux_link):
                 try:
-                    msg, _ = await get_tg_link_message(self.mux_link, self.user_id)
+                    msg, client = await get_tg_link_message(self.mux_link, self.user_id)
                     if msg:
+                        if isinstance(msg, list):
+                            msg = msg[0] # Handle first link if it was a range
                         media = msg.document or msg.video or msg.audio or msg.voice
                         if media:
-                            mux_file = await TgClient.bot.download_media(
-                                media, mux_path
-                            )
+                            mux_file = await client.download_media(media, mux_path)
+                            if mux_file:
+                                LOGGER.info(f"MUX secondary file downloaded: {mux_file}")
                 except Exception as e:
                     LOGGER.error(f"MUX TG Download Error: {e}")
             elif is_url(self.mux_link):
@@ -650,7 +652,7 @@ class Encode(TaskListener):
             cmd.extend(["-c:v", "copy"])
 
         # Mapping & MUX Logic
-        if self.mux_type:
+        if self.mux_type and mux_file:
             cmd.extend(["-map", "0:v:0"])
             if self.mux_type == "mux_vv":
                 cmd.extend(["-map", "1:v:0", "-map", "1:a?", "-map", "1:s?"])
@@ -659,6 +661,9 @@ class Encode(TaskListener):
             elif self.mux_type == "mux_vs":
                 cmd.extend(["-map", "0:a?", "-map", "1:s:0"])
             cmd.extend(["-c:a", "copy", "-c:s", "copy"])
+        elif self.mux_type and not mux_file:
+            await self.on_upload_error("MUX secondary file download failed. Aborting.")
+            return
         elif self.is_extract:
             cmd = ["xtra", "-hide_banner", "-loglevel", "error", "-i", file_path]
             # Find the track to extract

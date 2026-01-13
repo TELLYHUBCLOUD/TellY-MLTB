@@ -147,7 +147,8 @@ class BuzzHeavierUpload:
                         pass
 
             async with session.get(
-                f"{self.api_url}fs", headers={"Authorization": f"Bearer {self.token}"}
+                f"{self.api_url}fs",
+                headers={"Authorization": f"Bearer {self.token}"},
             ) as resp:
                 if resp.status == 200:
                     try:
@@ -178,8 +179,7 @@ class BuzzHeavierUpload:
                 async with session.put(url, data=file, headers=headers) as resp:
                     if resp.status in [200, 201]:
                         return await self.__resp_handler(await resp.text())
-                    else:
-                        raise Exception(f"HTTP {resp.status}: {await resp.text()}")
+                    raise Exception(f"HTTP {resp.status}: {await resp.text()}")
         return None
 
     async def create_folder(self, parentFolderId, folderName):
@@ -192,16 +192,17 @@ class BuzzHeavierUpload:
                 raise Exception("Could not determine Root Directory ID.")
 
         url = f"{self.api_url}fs/{parentFolderId}"
-        async with ClientSession() as session:
-            async with session.post(
+        async with (
+            ClientSession() as session,
+            session.post(
                 url=url,
                 json={"name": folderName},
                 headers={"Authorization": f"Bearer {self.token}"},
-            ) as resp:
-                if resp.status in [200, 201]:
-                    return await resp.json()
-                else:
-                    raise Exception(f"Create Folder Failed: {await resp.text()}")
+            ) as resp,
+        ):
+            if resp.status in [200, 201]:
+                return await resp.json()
+            raise Exception(f"Create Folder Failed: {await resp.text()}")
 
     async def upload_file(self, path: str, parentId: str = ""):
         if self.listener.is_cancelled:
@@ -251,7 +252,9 @@ class BuzzHeavierUpload:
                 break
 
             rel_path = ospath.relpath(root, input_directory)
-            current_folder_id = folder_ids.get(ospath.dirname(rel_path), main_folder_id)
+            current_folder_id = folder_ids.get(
+                ospath.dirname(rel_path), main_folder_id
+            )
 
             if rel_path != ".":
                 current_folder_id = folder_ids.get(rel_path)
@@ -317,7 +320,9 @@ class BuzzHeavierUpload:
             raise Exception("Invalid BuzzHeavier API Key, please check your token!")
 
         if await aiopath.isfile(self._path):
-            file_id = await self.upload_file(path=self._path, parentId=self.folder_id)
+            file_id = await self.upload_file(
+                path=self._path, parentId=self.folder_id
+            )
             if file_id:
                 file_id = str(file_id).strip()
                 if "{" in file_id or "}" in file_id:

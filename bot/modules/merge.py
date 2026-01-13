@@ -16,7 +16,6 @@ from bot.helper.listeners.task_listener import TaskListener
 from bot.helper.mirror_leech_utils.download_utils.aria2_download import (
     add_aria2_download,
 )
-from bot.helper.mirror_leech_utils.status_utils.ffmpeg_status import FFmpegStatus
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.message_utils import (
     auto_delete_message,
@@ -167,9 +166,7 @@ class Merge(TaskListener):
 
     def _parse_telegram_range(self, link: str) -> list:
         """Parse Telegram link range (e.g., t.me/channel/1-20)."""
-        match = re.search(
-            r"(https?://t\.me/(?:c/)?[\w\d]+/)(\d+)-(\d+)", link
-        )
+        match = re.search(r"(https?://t\.me/(?:c/)?[\w\d]+/)(\d+)-(\d+)", link)
         if match:
             base = match.group(1)
             start = int(match.group(2))
@@ -203,7 +200,7 @@ class Merge(TaskListener):
         seen = set()
         unique_inputs = []
         for inp in inputs:
-            inp_str = str(inp) if not hasattr(inp, 'id') else str(inp.id)
+            inp_str = str(inp) if not hasattr(inp, "id") else str(inp.id)
             if inp_str not in seen:
                 seen.add(inp_str)
                 unique_inputs.append(inp)
@@ -234,7 +231,6 @@ class Merge(TaskListener):
                 f"Files Added: {count}/20\n"
                 f"Send files to add, or /{BotCommands.MdoneCommand[0]} to start.",
             )
-        return None
 
     async def _handle_single_input(self):
         """Handle single input - add to session."""
@@ -256,7 +252,7 @@ class Merge(TaskListener):
                 f"⚠️ Merge Limit Reached!\n"
                 f"Use /{BotCommands.MdoneCommand[0]} to start.",
             )
-            return None
+            return
 
         link = self.inputs[0]
         session["inputs"].append(link)
@@ -276,7 +272,7 @@ class Merge(TaskListener):
                 f"✅ File Added: {count}/20\n"
                 f"Reply to next file or use /{BotCommands.MdoneCommand[0]} to start.",
             )
-        return None
+        return
 
     async def get_tg_link_message(self, link: str):
         """Fetch Telegram message from link."""
@@ -284,7 +280,9 @@ class Merge(TaskListener):
             return None
 
         try:
-            pattern = r"(?:https?://)?(?:www\.)?(?:t|telegram)\.me/(?:c/)?([\w\d_]+)/(\d+)"
+            pattern = (
+                r"(?:https?://)?(?:www\.)?(?:t|telegram)\.me/(?:c/)?([\w\d_]+)/(\d+)"
+            )
             match = re.search(pattern, link)
 
             if not match:
@@ -301,8 +299,7 @@ class Merge(TaskListener):
                 if str(chat_id).isdigit():
                     chat_id = int(chat_id)
 
-            message = await self.client.get_messages(chat_id, msg_id)
-            return message
+            return await self.client.get_messages(chat_id, msg_id)
 
         except Exception as e:
             LOGGER.error(f"Error getting TG Link message: {e}")
@@ -353,7 +350,11 @@ class Merge(TaskListener):
     ) -> bool:
         """Download a single input file."""
         # Handle message object directly
-        if hasattr(link, 'document') or hasattr(link, 'video') or hasattr(link, 'audio'):
+        if (
+            hasattr(link, "document")
+            or hasattr(link, "video")
+            or hasattr(link, "audio")
+        ):
             if link.document or link.video or link.audio:
                 await TelegramDownloadHelper(self).add_download(
                     link, current_path, self.client
@@ -370,11 +371,10 @@ class Merge(TaskListener):
                         message, current_path, self.client
                     )
                     return True
-                else:
-                    LOGGER.warning(f"Invalid or empty TG link: {link}")
-                    return False
+                LOGGER.warning(f"Invalid or empty TG link: {link}")
+                return False
 
-            elif is_url(link):
+            if is_url(link):
                 self.link = link
                 await add_aria2_download(self, current_path, [], None, None)
                 return True
@@ -411,7 +411,10 @@ class Merge(TaskListener):
         await self._create_concat_file(input_txt_path, input_files)
 
         # Setup FFMpeg status
-        from bot.helper.mirror_leech_utils.status_utils.merge_status import MergeStatus
+        from bot.helper.mirror_leech_utils.status_utils.merge_status import (
+            MergeStatus,
+        )
+
         ffmpeg = FFMpeg(self)
         async with task_dict_lock:
             if self.mid in task_dict:
@@ -444,7 +447,9 @@ class Merge(TaskListener):
         total_duration = await self._calculate_total_duration(input_files)
 
         # Execute merge
-        result = await ffmpeg.metadata_watermark_cmds(cmd, output_file, total_duration)
+        result = await ffmpeg.metadata_watermark_cmds(
+            cmd, output_file, total_duration
+        )
 
         if result:
             # Cleanup input files
@@ -521,7 +526,6 @@ class Merge(TaskListener):
     async def _adjust_container_for_codecs(self, input_files: list) -> str:
         """Adjust container format based on codecs present."""
         has_ass = False
-        has_complex_subs = False
 
         for file in input_files:
             try:
@@ -530,7 +534,7 @@ class Merge(TaskListener):
                     has_ass = True
                     break
                 if "subrip" in codecs or "srt" in codecs:
-                    has_complex_subs = True
+                    pass
             except Exception as e:
                 LOGGER.warning(f"Could not get codec info for {file}: {e}")
 
@@ -694,7 +698,7 @@ async def merge_session_handler(client, message):
 
     # Check for duplicate
     for existing in session["inputs"]:
-        if hasattr(existing, 'id') and hasattr(message, 'id'):
+        if hasattr(existing, "id") and hasattr(message, "id"):
             if existing.id == message.id:
                 await send_message(message, "⚠️ This file is already added!")
                 return

@@ -109,7 +109,9 @@ class TelegramUploader:
             if "AUTO_THUMBNAIL" not in self._listener.user_dict
             else False
         )
-        self._auto_thumb_type = self._listener.user_dict.get("AUTO_THUMBNAIL_TYPE") or (
+        self._auto_thumb_type = self._listener.user_dict.get(
+            "AUTO_THUMBNAIL_TYPE"
+        ) or (
             Config.AUTO_THUMBNAIL_TYPE
             if "AUTO_THUMBNAIL_TYPE" not in self._listener.user_dict
             else "poster"
@@ -655,10 +657,13 @@ class TelegramUploader:
         ):
             self._thumb = None
         thumb = self._thumb
-        
+
         # --- AUTO THUMBNAIL LOGIC ---
         if thumb is None and self._auto_thumb:
-            from bot.helper.ext_utils.auto_thumbnail_helper import AutoThumbnailHelper
+            from bot.helper.ext_utils.auto_thumbnail_helper import (
+                AutoThumbnailHelper,
+            )
+
             thumb = await AutoThumbnailHelper.get_auto_thumbnail(
                 file, enabled=self._auto_thumb, thumb_type=self._auto_thumb_type
             )

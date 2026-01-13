@@ -1,7 +1,9 @@
 from bot import LOGGER
 from bot.helper.ext_utils.bot_utils import new_task, sync_to_async
 from bot.helper.ext_utils.links_utils import is_gdrive_link
-from bot.helper.mirror_leech_utils.uphoster_utils.gdrive_utils.delete import GoogleDriveDelete
+from bot.helper.mirror_leech_utils.uphoster_utils.gdrive_utils.delete import (
+    GoogleDriveDelete,
+)
 from bot.helper.telegram_helper.message_utils import (
     auto_delete_message,
     send_message,

@@ -46,6 +46,7 @@ class LuluStreamStatus:
         try:
             seconds = (self._size - self._obj.processed_bytes) / self._obj.speed
             from bot.helper.ext_utils.status_utils import get_readable_time
+
             return get_readable_time(seconds)
         except Exception:
             return "-"

@@ -79,10 +79,9 @@ class PixelDrainUpload:
     async def __resp_handler(self, response):
         if response.get("success") or "id" in response:
             return response.get("id")
-        elif response.get("value") == "file_not_found":
+        if response.get("value") == "file_not_found":
             raise Exception("File not found.")
-        else:
-            raise Exception(f"Error: {response.get('message', 'Unknown Error')}")
+        raise Exception(f"Error: {response.get('message', 'Unknown Error')}")
 
     @retry(
         wait=wait_exponential(multiplier=2, min=4, max=8),
@@ -100,8 +99,7 @@ class PixelDrainUpload:
                         return await self.__resp_handler(
                             await resp.json(content_type=None)
                         )
-                    else:
-                        raise Exception(f"HTTP {resp.status}: {await resp.text()}")
+                    raise Exception(f"HTTP {resp.status}: {await resp.text()}")
         return None
 
     async def create_list(self, title, files):
@@ -160,8 +158,7 @@ class PixelDrainUpload:
 
         if list_id:
             return f"list/{list_id}"
-        else:
-            return f"u/{uploaded_files[0]['id']}"
+        return f"u/{uploaded_files[0]['id']}"
 
     async def upload(self):
         try:
@@ -233,4 +230,6 @@ class PixelDrainUpload:
         self.listener.is_cancelled = True
         if self.is_uploading:
             LOGGER.info(f"Cancelling PixelDrain Upload: {self.listener.name}")
-            await self.listener.on_upload_error("PixelDrain upload has been cancelled!")
+            await self.listener.on_upload_error(
+                "PixelDrain upload has been cancelled!"
+            )

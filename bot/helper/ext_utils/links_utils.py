@@ -1,6 +1,5 @@
-from re import match as re_match, compile as re_compile
-from typing import Optional
-
+from re import compile as re_compile
+from re import match as re_match
 
 # Pre-compile regex patterns for better performance
 _MAGNET_PATTERN = re_compile(
@@ -45,13 +44,13 @@ _GDRIVE_DOMAINS = {
 def is_magnet(url: str) -> bool:
     """
     Check if the given string is a valid magnet link.
-    
+
     Args:
         url: The string to check
-        
+
     Returns:
         bool: True if valid magnet link, False otherwise
-        
+
     Examples:
         >>> is_magnet("magnet:?xt=urn:btih:abc123...")
         True
@@ -67,13 +66,13 @@ def is_url(url: str) -> bool:
     """
     Check if the given string is a valid URL.
     Supports: http, https, ftp, rtmp, rtmps, mms, rtsp protocols.
-    
+
     Args:
         url: The string to check
-        
+
     Returns:
         bool: True if valid URL, False otherwise
-        
+
     Examples:
         >>> is_url("https://example.com/path")
         True
@@ -88,13 +87,13 @@ def is_url(url: str) -> bool:
 def is_gdrive_link(url: str) -> bool:
     """
     Check if the given string is a Google Drive link.
-    
+
     Args:
         url: The string to check
-        
+
     Returns:
         bool: True if Google Drive link, False otherwise
-        
+
     Examples:
         >>> is_gdrive_link("https://drive.google.com/file/d/abc123")
         True
@@ -103,7 +102,7 @@ def is_gdrive_link(url: str) -> bool:
     """
     if not url or not isinstance(url, str):
         return False
-    
+
     # Convert to lowercase for case-insensitive check
     url_lower = url.lower()
     return any(domain in url_lower for domain in _GDRIVE_DOMAINS)
@@ -113,13 +112,13 @@ def is_telegram_link(url: str) -> bool:
     """
     Check if the given string is a Telegram link.
     Supports: t.me, telegram.me, telegram.dog, and tg:// protocol.
-    
+
     Args:
         url: The string to check
-        
+
     Returns:
         bool: True if Telegram link, False otherwise
-        
+
     Examples:
         >>> is_telegram_link("https://t.me/channel/123")
         True
@@ -135,13 +134,13 @@ def is_share_link(url: str) -> bool:
     """
     Check if the given string is a file sharing link.
     Supports: gdtot, filepress, filebee, appdrive, gdflix domains.
-    
+
     Args:
         url: The string to check
-        
+
     Returns:
         bool: True if file sharing link, False otherwise
-        
+
     Examples:
         >>> is_share_link("https://example.gdtot.com/file")
         True
@@ -156,13 +155,13 @@ def is_share_link(url: str) -> bool:
 def is_rclone_path(path: str) -> bool:
     """
     Check if the given string is a valid rclone path.
-    
+
     Args:
         path: The string to check
-        
+
     Returns:
         bool: True if valid rclone path, False otherwise
-        
+
     Examples:
         >>> is_rclone_path("remote:path/to/file")
         True
@@ -173,7 +172,7 @@ def is_rclone_path(path: str) -> bool:
     """
     if not path or not isinstance(path, str):
         return False
-    
+
     try:
         return bool(_RCLONE_PATH_PATTERN.match(path))
     except Exception:
@@ -184,13 +183,13 @@ def is_gdrive_id(id_: str) -> bool:
     """
     Check if the given string is a valid Google Drive file/folder ID.
     Supports prefixes: tp:, sa:, mtp: and special values: gdl, root.
-    
+
     Args:
         id_: The string to check
-        
+
     Returns:
         bool: True if valid Google Drive ID, False otherwise
-        
+
     Examples:
         >>> is_gdrive_id("1abc123xyz789-_ABC")
         True
@@ -206,16 +205,16 @@ def is_gdrive_id(id_: str) -> bool:
     return bool(_GDRIVE_ID_PATTERN.match(id_))
 
 
-def extract_gdrive_id(url: str) -> Optional[str]:
+def extract_gdrive_id(url: str) -> str | None:
     """
     Extract Google Drive file/folder ID from a Google Drive URL.
-    
+
     Args:
         url: The Google Drive URL
-        
+
     Returns:
         Optional[str]: The extracted ID or None if not found
-        
+
     Examples:
         >>> extract_gdrive_id("https://drive.google.com/file/d/abc123/view")
         'abc123'
@@ -224,35 +223,39 @@ def extract_gdrive_id(url: str) -> Optional[str]:
     """
     if not is_gdrive_link(url):
         return None
-    
+
     # Pattern 1: /d/{id}/ or /d/{id}
     match = re_match(r"https?://.*drive\.google\.com/.*\/d\/([a-zA-Z0-9-_]+)", url)
     if match:
         return match.group(1)
-    
+
     # Pattern 2: ?id={id}
-    match = re_match(r"https?://.*drive\.google\.com/.*[\?&]id=([a-zA-Z0-9-_]+)", url)
+    match = re_match(
+        r"https?://.*drive\.google\.com/.*[\?&]id=([a-zA-Z0-9-_]+)", url
+    )
     if match:
         return match.group(1)
-    
+
     # Pattern 3: /folders/{id}
-    match = re_match(r"https?://.*drive\.google\.com/.*\/folders\/([a-zA-Z0-9-_]+)", url)
+    match = re_match(
+        r"https?://.*drive\.google\.com/.*\/folders\/([a-zA-Z0-9-_]+)", url
+    )
     if match:
         return match.group(1)
-    
+
     return None
 
 
 def get_link_type(url: str) -> str:
     """
     Determine the type of the given link/path.
-    
+
     Args:
         url: The link or path to check
-        
+
     Returns:
         str: The link type ('magnet', 'gdrive', 'telegram', 'share', 'rclone', 'url', 'unknown')
-        
+
     Examples:
         >>> get_link_type("magnet:?xt=...")
         'magnet'
@@ -261,7 +264,7 @@ def get_link_type(url: str) -> str:
     """
     if not url or not isinstance(url, str):
         return "unknown"
-    
+
     if is_magnet(url):
         return "magnet"
     if is_telegram_link(url):
@@ -274,52 +277,47 @@ def get_link_type(url: str) -> str:
         return "rclone"
     if is_url(url):
         return "url"
-    
+
     return "unknown"
 
 
 def sanitize_url(url: str) -> str:
     """
     Sanitize a URL by removing leading/trailing whitespace and common issues.
-    
+
     Args:
         url: The URL to sanitize
-        
+
     Returns:
         str: The sanitized URL
     """
     if not url or not isinstance(url, str):
         return ""
-    
+
     # Remove leading/trailing whitespace
     url = url.strip()
-    
+
     # Remove zero-width spaces and other invisible characters
-    url = url.replace('\u200b', '').replace('\u200c', '').replace('\u200d', '')
-    
-    return url
+    return url.replace("\u200b", "").replace("\u200c", "").replace("\u200d", "")
 
 
 def is_valid_filename(filename: str) -> bool:
     """
     Check if a string is a valid filename (not a URL or path).
-    
+
     Args:
         filename: The string to check
-        
+
     Returns:
         bool: True if valid filename, False otherwise
     """
     if not filename or not isinstance(filename, str):
         return False
-    
+
     # Check if it's not a URL or path
     if is_url(filename) or is_telegram_link(filename) or is_magnet(filename):
         return False
-    
+
     # Check for invalid filename characters
-    invalid_chars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|']
-    if any(char in filename for char in invalid_chars):
-        return False
-    
-    return True
+    invalid_chars = ["/", "\\", ":", "*", "?", '"', "<", ">", "|"]
+    return not any(char in filename for char in invalid_chars)

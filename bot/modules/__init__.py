@@ -34,12 +34,12 @@ from .sox import spectrum_handler
 from .speedtest import speedtest
 from .stats import bot_stats, get_packages_version
 from .status import status_pages, task_status
+from .terabox import terabox_handler
 from .users_settings import (
     edit_user_settings,
     get_users_settings,
     send_user_settings,
 )
-from .terabox import terabox_handler
 from .videotool import select_encode_options, videotool
 from .ytdlp import ytdl, ytdl_leech
 

@@ -166,7 +166,9 @@ async def get_user_settings(from_user, stype="main"):
             if user_dict.get("TMDB_API_KEY") or Config.TMDB_API_KEY
             else "Not Set"
         )
-        auto_thumb_type = user_dict.get("AUTO_THUMBNAIL_TYPE") or Config.AUTO_THUMBNAIL_TYPE
+        auto_thumb_type = (
+            user_dict.get("AUTO_THUMBNAIL_TYPE") or Config.AUTO_THUMBNAIL_TYPE
+        )
 
         buttons.data_button("Back", f"userset {user_id} back")
         buttons.data_button("Close", f"userset {user_id} close")
@@ -259,8 +261,12 @@ Stop Duplicate is <b>{sd_msg}</b>"""
 GoFile Token is <b>{gofile_token}</b>
 GoFile Folder ID is <code>{gofile_folder}</code>"""
     elif stype == "buzzheavier":
-        buttons.data_button("BuzzHeavier Token", f"userset {user_id} menu BUZZHEAVIER_TOKEN")
-        buttons.data_button("Folder ID", f"userset {user_id} menu BUZZHEAVIER_FOLDER_ID")
+        buttons.data_button(
+            "BuzzHeavier Token", f"userset {user_id} menu BUZZHEAVIER_TOKEN"
+        )
+        buttons.data_button(
+            "Folder ID", f"userset {user_id} menu BUZZHEAVIER_FOLDER_ID"
+        )
         buttons.data_button("Back", f"userset {user_id} back")
         buttons.data_button("Close", f"userset {user_id} close")
 
@@ -271,14 +277,18 @@ GoFile Folder ID is <code>{gofile_folder}</code>"""
 BuzzHeavier Token is <b>{bh_token}</b>
 BuzzHeavier Folder ID is <code>{bh_folder}</code>"""
     elif stype == "pixeldrain":
-        buttons.data_button("PixelDrain Key", f"userset {user_id} menu PIXELDRAIN_KEY")
+        buttons.data_button(
+            "PixelDrain Key", f"userset {user_id} menu PIXELDRAIN_KEY"
+        )
         buttons.data_button("Back", f"userset {user_id} back")
         buttons.data_button("Close", f"userset {user_id} close")
 
         pd_key = "Set" if user_dict.get("PIXELDRAIN_KEY", False) else "Not Set"
         text = f"<u>PixelDrain Settings for {name}</u>\nPixelDrain API Key is <b>{pd_key}</b>"
     elif stype == "lulustream":
-        buttons.data_button("LuluStream Key", f"userset {user_id} menu LULUSTREAM_KEY")
+        buttons.data_button(
+            "LuluStream Key", f"userset {user_id} menu LULUSTREAM_KEY"
+        )
         buttons.data_button("Back", f"userset {user_id} back")
         buttons.data_button("Close", f"userset {user_id} close")
 
@@ -309,7 +319,9 @@ BuzzHeavier Folder ID is <code>{bh_folder}</code>"""
     elif stype == "thumbnail_layout_menu":
         buttons.data_button("Poster", f"userset {user_id} set_thumb_type poster")
         buttons.data_button("Backdrop", f"userset {user_id} set_thumb_type backdrop")
-        buttons.data_button("Grid (Manual)", f"userset {user_id} set THUMBNAIL_LAYOUT")
+        buttons.data_button(
+            "Grid (Manual)", f"userset {user_id} set THUMBNAIL_LAYOUT"
+        )
         buttons.data_button("Back", f"userset {user_id} leech")
         buttons.data_button("Close", f"userset {user_id} close")
         text = f"<u>Auto Thumbnail Settings for {name}</u>\n\nChoose the default image type for automatically fetched thumbnails.\nPoster: Portrait (2:3)\nBackdrop: Landscape (16:9)\n\n<i>Note: Grid (Manual) allows setting a custom grid layout (e.g., 3x3) for FFmpeg-generated thumbnails.</i>"
@@ -380,19 +392,27 @@ Add to Playlist ID: <code>{yt_add_to_playlist_id}</code>"""
         if user_dict.get("REMOVE_AUDIO", False) or (
             "REMOVE_AUDIO" not in user_dict and Config.REMOVE_AUDIO
         ):
-            buttons.data_button("Disable Remove Audio", f"userset {user_id} tog REMOVE_AUDIO f")
+            buttons.data_button(
+                "Disable Remove Audio", f"userset {user_id} tog REMOVE_AUDIO f"
+            )
             r_audio = "Enabled"
         else:
-            buttons.data_button("Enable Remove Audio", f"userset {user_id} tog REMOVE_AUDIO t")
+            buttons.data_button(
+                "Enable Remove Audio", f"userset {user_id} tog REMOVE_AUDIO t"
+            )
             r_audio = "Disabled"
 
         if user_dict.get("REMOVE_SUBS", False) or (
             "REMOVE_SUBS" not in user_dict and Config.REMOVE_SUBS
         ):
-            buttons.data_button("Disable Remove Subs", f"userset {user_id} tog REMOVE_SUBS f")
+            buttons.data_button(
+                "Disable Remove Subs", f"userset {user_id} tog REMOVE_SUBS f"
+            )
             r_subs = "Enabled"
         else:
-            buttons.data_button("Enable Remove Subs", f"userset {user_id} tog REMOVE_SUBS t")
+            buttons.data_button(
+                "Enable Remove Subs", f"userset {user_id} tog REMOVE_SUBS t"
+            )
             r_subs = "Disabled"
 
         buttons.data_button("Back", f"userset {user_id} back")
@@ -654,7 +674,6 @@ Automatically fetches IMDB info and renames files using the template.</i>"""
             ffc = "Added by owner"
         else:
             ffc = "None"
-
 
         if user_dict:
             buttons.data_button("Reset All", f"userset {user_id} reset all")
@@ -1035,7 +1054,13 @@ async def edit_user_settings(client, query):
             back_to = "gdrive"
         elif data[3] == "USER_TOKENS":
             back_to = "main"
-        elif data[3] in ["AUTO_YT_LEECH", "AUTO_LEECH", "AUTO_MIRROR", "AUTO_VIDEOTOOL", "AUTO_MERGE"]:
+        elif data[3] in [
+            "AUTO_YT_LEECH",
+            "AUTO_LEECH",
+            "AUTO_MIRROR",
+            "AUTO_VIDEOTOOL",
+            "AUTO_MERGE",
+        ]:
             back_to = "auto_process"
         elif data[3] in ["REMOVE_AUDIO", "REMOVE_SUBS"]:
             back_to = "videotools"

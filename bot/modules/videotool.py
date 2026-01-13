@@ -31,7 +31,6 @@ from bot.helper.listeners.task_listener import TaskListener
 from bot.helper.mirror_leech_utils.download_utils.aria2_download import (
     add_aria2_download,
 )
-from bot.helper.mirror_leech_utils.status_utils.ffmpeg_status import FFmpegStatus
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.telegram_helper.message_utils import (
@@ -280,10 +279,10 @@ class EncodeSelection:
         async def func(_, msg):
             if msg.text:
                 result[0] = msg.text
-            elif hasattr(msg, 'link') and msg.link:
+            elif hasattr(msg, "link") and msg.link:
                 result[0] = msg.link
             elif msg.reply_to_message:
-                if hasattr(msg.reply_to_message, 'link'):
+                if hasattr(msg.reply_to_message, "link"):
                     result[0] = msg.reply_to_message.link
                 elif msg.reply_to_message.text:
                     result[0] = msg.reply_to_message.text
@@ -303,7 +302,10 @@ class EncodeSelection:
                 if text and "-" in text:
                     parts = text.split("-")
                     if len(parts) == 2:
-                        self.listener.trim_start, self.listener.trim_end = parts[0].strip(), parts[1].strip()
+                        self.listener.trim_start, self.listener.trim_end = (
+                            parts[0].strip(),
+                            parts[1].strip(),
+                        )
             elif action == "watermark":
                 self.listener.watermark_text = text
             elif action == "subsync":
@@ -511,7 +513,12 @@ class Encode(TaskListener):
             selector.remove_subs = True
 
         if self.is_auto:
-            qual, map1, map2, mode = selector.quality, selector.audio_map, selector.sub_map, selector.mode
+            qual, map1, map2, mode = (
+                selector.quality,
+                selector.audio_map,
+                selector.sub_map,
+                selector.mode,
+            )
         else:
             qual, map1, map2, mode = await selector.get_selection()
         if qual is None:
@@ -525,7 +532,7 @@ class Encode(TaskListener):
         else:
             self.remove_audio = selector.remove_audio
             self.remove_subs = selector.remove_subs
-        
+
         # Copy over user selections
         self.is_extract = selector.is_extract
 
@@ -667,7 +674,10 @@ class Encode(TaskListener):
                 return
 
         ffmpeg = FFMpeg(self)
-        from bot.helper.mirror_leech_utils.status_utils.videotools_status import VideoToolsStatus
+        from bot.helper.mirror_leech_utils.status_utils.videotools_status import (
+            VideoToolsStatus,
+        )
+
         async with task_dict_lock:
             if self.mid in task_dict:
                 self.gid = task_dict[self.mid].gid()
@@ -701,16 +711,14 @@ class Encode(TaskListener):
                 out_ext = "srt"
         elif self.mode in ["mp4", "mkv", "mov", "avi", "webm"]:
             out_ext = self.mode
-        
+
         if not out_ext:
             out_ext = ospath.splitext(file_path)[1][1:]
 
         # Video Filter Logic
         vf = []
-        requires_encode = False
-        
+
         if self.quality not in ["Original", "mp4", "mkv", "mov", "avi", "webm"]:
-            requires_encode = True
             if self.quality == "1080p":
                 vf.append("scale=-2:1080")
             elif self.quality == "720p":
@@ -727,8 +735,9 @@ class Encode(TaskListener):
                 vf.append("scale=-2:144")
 
         if self.watermark_text:
-            requires_encode = True
-            escaped_text = self.watermark_text.replace("'", "'\\''").replace(":", "\\:")
+            escaped_text = self.watermark_text.replace("'", "'\\''").replace(
+                ":", "\\:"
+            )
             vf.append(
                 f"drawtext=text='{escaped_text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=24:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2"
             )
@@ -739,36 +748,53 @@ class Encode(TaskListener):
             cmd = ["xtra", "-hide_banner", "-loglevel", "error", "-i", file_path]
             keep_audio = [idx for idx, k in self.audio_map.items() if k]
             keep_sub = [idx for idx, k in self.sub_map.items() if k]
-            
+
             if keep_audio:
-                cmd.extend(["-map", f"0:{keep_audio[0]}", "-c:a", "copy", "-vn", "-sn"])
+                cmd.extend(
+                    ["-map", f"0:{keep_audio[0]}", "-c:a", "copy", "-vn", "-sn"]
+                )
             elif keep_sub:
-                cmd.extend(["-map", f"0:{keep_sub[0]}", "-c:s", "copy", "-vn", "-an"])
-                
+                cmd.extend(
+                    ["-map", f"0:{keep_sub[0]}", "-c:s", "copy", "-vn", "-an"]
+                )
+
         elif self.mux_type and mux_file:
             # MUX operation
             if vf:
                 cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
             else:
                 cmd.extend(["-c:v", "copy"])
-                
+
             cmd.extend(["-map", "0:v:0"])
-            
+
             if self.mux_type == "mux_vv":
-                cmd.extend(["-map", "1:v:0", "-map", "0:a?", "-map", "0:s?", "-map", "1:a?", "-map", "1:s?"])
+                cmd.extend(
+                    [
+                        "-map",
+                        "1:v:0",
+                        "-map",
+                        "0:a?",
+                        "-map",
+                        "0:s?",
+                        "-map",
+                        "1:a?",
+                        "-map",
+                        "1:s?",
+                    ]
+                )
             elif self.mux_type == "mux_va":
                 cmd.extend(["-map", "0:a?", "-map", "1:a:0", "-map", "0:s?"])
             elif self.mux_type == "mux_vs":
                 cmd.extend(["-map", "0:a?", "-map", "1:s:0"])
             cmd.extend(["-c:a", "copy", "-c:s", "copy"])
-            
+
         elif self.has_metadata_selection and self.audio_map:
             # Stream selection with metadata
             if vf:
                 cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
             else:
                 cmd.extend(["-c:v", "copy"])
-                
+
             cmd.extend(["-map", "0:v"])
             for idx, keep in self.audio_map.items():
                 if keep:
@@ -777,19 +803,19 @@ class Encode(TaskListener):
                 if keep:
                     cmd.extend(["-map", f"0:{idx}"])
             cmd.extend(["-c:a", "copy", "-c:s", "copy"])
-            
+
         else:
             # Standard processing
             if vf:
                 cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
             else:
                 cmd.extend(["-c:v", "copy"])
-                
+
             if self.remove_audio:
                 cmd.append("-an")
             else:
                 cmd.extend(["-c:a", "copy"])
-                
+
             if self.remove_subs:
                 cmd.append("-sn")
             else:
@@ -804,8 +830,11 @@ class Encode(TaskListener):
                 LOGGER.warning(f"Invalid subsync offset: {self.subsync_offset}")
 
         # Output file setup
-        out_name = self.new_name or f"{ospath.splitext(ospath.basename(file_path))[0]}_processed.{out_ext}"
-        
+        out_name = (
+            self.new_name
+            or f"{ospath.splitext(ospath.basename(file_path))[0]}_processed.{out_ext}"
+        )
+
         if not out_name.lower().endswith(f".{out_ext.lower()}"):
             out_name = f"{ospath.splitext(out_name)[0]}.{out_ext}"
 
@@ -815,7 +844,7 @@ class Encode(TaskListener):
         LOGGER.info(f"FFmpeg Command: {' '.join(cmd)}")
 
         res = await ffmpeg.metadata_watermark_cmds(cmd, file_path)
-        
+
         if res:
             try:
                 # Cleanup original and mux files

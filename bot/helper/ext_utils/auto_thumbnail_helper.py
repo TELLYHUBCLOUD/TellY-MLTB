@@ -3,20 +3,17 @@ Auto Thumbnail Helper Module
 Automatically fetches movie/TV show thumbnails from IMDB and TMDB based on filename metadata
 """
 
-import contextlib
 import os
 import re
+from os import path as ospath
 
 import aiohttp
 from aiofiles import open as aioopen
-from datetime import datetime, timedelta
-from os import path as ospath
-from time import time
-from typing import ClassVar
 
 from bot import LOGGER
 from bot.core.config_manager import Config
 from bot.helper.ext_utils.template_processor import extract_metadata_from_filename
+
 
 class AutoThumbnailHelper:
     """Helper class for automatically fetching thumbnails from IMDB/TMDB"""
@@ -27,7 +24,11 @@ class AutoThumbnailHelper:
 
     @classmethod
     async def get_auto_thumbnail(
-        cls, filename: str, user_id: int | None = None, enabled: bool | None = None, thumb_type: str | None = None
+        cls,
+        filename: str,
+        user_id: int | None = None,
+        enabled: bool | None = None,
+        thumb_type: str | None = None,
     ) -> str | None:
         """Get auto thumbnail for a file based on its metadata"""
         try:
@@ -49,7 +50,9 @@ class AutoThumbnailHelper:
             episode = metadata.get("episode")
             is_tv_show = bool(season or episode or cls._detect_tv_patterns(filename))
 
-            cache_key = cls._generate_cache_key(clean_title, year, is_tv_show, thumb_type or "poster")
+            cache_key = cls._generate_cache_key(
+                clean_title, year, is_tv_show, thumb_type or "poster"
+            )
             cached_thumbnail = await cls._get_cached_thumbnail(cache_key)
             if cached_thumbnail:
                 return cached_thumbnail
@@ -61,8 +64,7 @@ class AutoThumbnailHelper:
             if not thumbnail_url:
                 return None
 
-            thumbnail_path = await cls._download_thumbnail(thumbnail_url, cache_key)
-            return thumbnail_path
+            return await cls._download_thumbnail(thumbnail_url, cache_key)
 
         except Exception as e:
             LOGGER.error(f"Error getting auto thumbnail for {filename}: {e}")
@@ -73,23 +75,39 @@ class AutoThumbnailHelper:
         # Simplified for brevity, prioritizing the user's logic
         title = filename.rsplit(".", 1)[0] if "." in filename else filename
         title = re.sub(r"[._-]+", " ", title)
-        title = re.sub(r"\b(720p|1080p|2160p|4k|x264|x265|hevc|bluray|webrip)\b", "", title, flags=re.IGNORECASE)
+        title = re.sub(
+            r"\b(720p|1080p|2160p|4k|x264|x265|hevc|bluray|webrip)\b",
+            "",
+            title,
+            flags=re.IGNORECASE,
+        )
         # Remove year
         title = re.sub(r"\b(19|20)\d{2}\b", "", title)
         return title.strip()
 
     @classmethod
-    async def _advanced_search_strategy(cls, title, year, is_tv, filename, thumb_type=None):
+    async def _advanced_search_strategy(
+        cls, title, year, is_tv, filename, thumb_type=None
+    ):
         if Config.TMDB_API_KEY and Config.TMDB_ENABLED:
-            res = await TMDBHelper.search_movie_enhanced(title, year) if not is_tv else await TMDBHelper.search_tv_show_enhanced(title, year)
+            res = (
+                await TMDBHelper.search_movie_enhanced(title, year)
+                if not is_tv
+                else await TMDBHelper.search_tv_show_enhanced(title, year)
+            )
             if res:
                 layout = (thumb_type or Config.AUTO_THUMBNAIL_TYPE).lower()
-                path = res.get("backdrop_path") if layout == "backdrop" and res.get("backdrop_path") else res.get("poster_path")
+                path = (
+                    res.get("backdrop_path")
+                    if layout == "backdrop" and res.get("backdrop_path")
+                    else res.get("poster_path")
+                )
                 if path:
                     return TMDBHelper.get_poster_url(path, "w500")
 
         if Config.IMDB_ENABLED:
             from bot.modules.imdb import get_poster
+
             imdb_data = await get_poster(title, False, False)
             if imdb_data and imdb_data.get("poster"):
                 return imdb_data["poster"]
@@ -97,7 +115,9 @@ class AutoThumbnailHelper:
 
     @classmethod
     def _generate_cache_key(cls, title, year, is_tv, thumb_type):
-        return f"{title}_{year}_{'tv' if is_tv else 'movie'}_{thumb_type}".lower().replace(" ", "_")
+        return f"{title}_{year}_{'tv' if is_tv else 'movie'}_{thumb_type}".lower().replace(
+            " ", "_"
+        )
 
     @classmethod
     async def _get_cached_thumbnail(cls, key):
@@ -121,7 +141,14 @@ class AutoThumbnailHelper:
 
     @classmethod
     def _detect_tv_patterns(cls, filename):
-        return bool(re.search(r"S\d{1,2}E\d{1,3}|Season\s*\d+|Episode\s*\d+|\d{1,2}x\d{1,3}", filename, re.IGNORECASE))
+        return bool(
+            re.search(
+                r"S\d{1,2}E\d{1,3}|Season\s*\d+|Episode\s*\d+|\d{1,2}x\d{1,3}",
+                filename,
+                re.IGNORECASE,
+            )
+        )
+
 
 class TMDBHelper:
     BASE_URL = "https://api.themoviedb.org/3"
@@ -137,14 +164,23 @@ class TMDBHelper:
 
     @classmethod
     async def _search(cls, mtype, title, year):
-        if not Config.TMDB_API_KEY: return None
-        params = {"api_key": Config.TMDB_API_KEY, "query": title, "language": Config.TMDB_LANGUAGE}
-        if year: params["year" if mtype == "movie" else "first_air_date_year"] = year
+        if not Config.TMDB_API_KEY:
+            return None
+        params = {
+            "api_key": Config.TMDB_API_KEY,
+            "query": title,
+            "language": Config.TMDB_LANGUAGE,
+        }
+        if year:
+            params["year" if mtype == "movie" else "first_air_date_year"] = year
         async with aiohttp.ClientSession() as session:
-            async with session.get(f"{cls.BASE_URL}/search/{mtype}", params=params) as resp:
+            async with session.get(
+                f"{cls.BASE_URL}/search/{mtype}", params=params
+            ) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    if data.get("results"): return data["results"][0]
+                    if data.get("results"):
+                        return data["results"][0]
         return None
 
     @classmethod

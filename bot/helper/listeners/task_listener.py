@@ -36,8 +36,6 @@ from bot.helper.ext_utils.files_utils import (
 from bot.helper.ext_utils.links_utils import is_gdrive_id
 from bot.helper.ext_utils.status_utils import get_readable_file_size
 from bot.helper.ext_utils.task_manager import check_running_tasks, start_from_queued
-from bot.helper.mirror_leech_utils.uphoster_utils.gdrive_utils.upload import GoogleDriveUpload
-from bot.helper.mirror_leech_utils.uphoster_utils.rclone_utils.transfer import RcloneTransferHelper
 from bot.helper.mirror_leech_utils.status_utils.gdrive_status import (
     GoogleDriveStatus,
 )
@@ -46,6 +44,12 @@ from bot.helper.mirror_leech_utils.status_utils.rclone_status import RcloneStatu
 from bot.helper.mirror_leech_utils.status_utils.telegram_status import TelegramStatus
 from bot.helper.mirror_leech_utils.status_utils.yt_status import YtStatus
 from bot.helper.mirror_leech_utils.telegram_uploader import TelegramUploader
+from bot.helper.mirror_leech_utils.uphoster_utils.gdrive_utils.upload import (
+    GoogleDriveUpload,
+)
+from bot.helper.mirror_leech_utils.uphoster_utils.rclone_utils.transfer import (
+    RcloneTransferHelper,
+)
 from bot.helper.mirror_leech_utils.youtube_utils.youtube_upload import YouTubeUpload
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.telegram_helper.message_utils import (
@@ -474,11 +478,11 @@ class TaskListener(TaskConfig):
             del yt
         elif self.up_dest == "gofile":
             LOGGER.info(f"GoFile Upload Name: {self.name}")
-            from bot.helper.mirror_leech_utils.uphoster_utils.gofile_utils.upload import (
-                GoFileUpload,
-            )
             from bot.helper.mirror_leech_utils.status_utils.gofile_status import (
                 GoFileStatus,
+            )
+            from bot.helper.mirror_leech_utils.uphoster_utils.gofile_utils.upload import (
+                GoFileUpload,
             )
 
             gofile = GoFileUpload(self, up_path)
@@ -491,11 +495,11 @@ class TaskListener(TaskConfig):
             del gofile
         elif self.up_dest == "bh":
             LOGGER.info(f"BuzzHeavier Upload Name: {self.name}")
-            from bot.helper.mirror_leech_utils.uphoster_utils.buzzheavier_utils.upload import (
-                BuzzHeavierUpload,
-            )
             from bot.helper.mirror_leech_utils.status_utils.buzzheavier_status import (
                 BuzzHeavierStatus,
+            )
+            from bot.helper.mirror_leech_utils.uphoster_utils.buzzheavier_utils.upload import (
+                BuzzHeavierUpload,
             )
 
             buzzheavier = BuzzHeavierUpload(self, up_path)
@@ -508,11 +512,11 @@ class TaskListener(TaskConfig):
             del buzzheavier
         elif self.up_dest == "pd":
             LOGGER.info(f"PixelDrain Upload Name: {self.name}")
-            from bot.helper.mirror_leech_utils.uphoster_utils.pixeldrain_utils.upload import (
-                PixelDrainUpload,
-            )
             from bot.helper.mirror_leech_utils.status_utils.pixeldrain_status import (
                 PixelDrainStatus,
+            )
+            from bot.helper.mirror_leech_utils.uphoster_utils.pixeldrain_utils.upload import (
+                PixelDrainUpload,
             )
 
             pixeldrain = PixelDrainUpload(self, up_path)
@@ -525,13 +529,13 @@ class TaskListener(TaskConfig):
             del pixeldrain
         elif self.up_dest == "ls":
             LOGGER.info(f"LuluStream Upload Name: {self.name}")
-            from bot.helper.mirror_leech_utils.uphoster_utils.lulustream_utils.lulustream import (
-                LuluStream,
-            )
+            from bot import user_data
             from bot.helper.mirror_leech_utils.status_utils.lulustream_status import (
                 LuluStreamStatus,
             )
-            from bot import user_data
+            from bot.helper.mirror_leech_utils.uphoster_utils.lulustream_utils.lulustream import (
+                LuluStream,
+            )
 
             user_dict = user_data.get(self.user_id, {})
             lulu_key = user_dict.get("LULUSTREAM_KEY") or Config.LULUSTREAM_KEY

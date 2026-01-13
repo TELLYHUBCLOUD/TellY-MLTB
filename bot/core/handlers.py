@@ -298,9 +298,3 @@ def add_handlers():
             filters=CustomFilters.authorized,
         ),
     )
-    TgClient.bot.add_handler(
-        CallbackQueryHandler(
-            select_encode_options,
-            filters=regex("^enc") & CustomFilters.authorized,
-        ),
-    )

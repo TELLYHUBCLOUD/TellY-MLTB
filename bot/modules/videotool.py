@@ -537,8 +537,20 @@ class Encode(TaskListener):
         target_file = None
         max_size = 0
         video_extensions = {
-            ".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".ts",
-            ".m4v", ".dat", ".vob", ".3gp", ".mpeg", ".mpg"
+            ".mp4",
+            ".mkv",
+            ".avi",
+            ".mov",
+            ".webm",
+            ".flv",
+            ".wmv",
+            ".ts",
+            ".m4v",
+            ".dat",
+            ".vob",
+            ".3gp",
+            ".mpeg",
+            ".mpg",
         }
 
         for root, _, files_list in await sync_to_async(walk, self.dir):
@@ -570,16 +582,22 @@ class Encode(TaskListener):
                     if msg:
                         media = msg.document or msg.video or msg.audio or msg.voice
                         if media:
-                            mux_file = await TgClient.bot.download_media(media, mux_path)
+                            mux_file = await TgClient.bot.download_media(
+                                media, mux_path
+                            )
                 except Exception as e:
                     LOGGER.error(f"MUX TG Download Error: {e}")
             elif is_url(self.mux_link):
                 try:
                     from httpx import AsyncClient
+
                     async with AsyncClient() as client:
                         async with client.stream("GET", self.mux_link) as response:
                             if response.status_code == 200:
-                                filename = self.mux_link.split("/")[-1].split("?")[0] or "mux_file"
+                                filename = (
+                                    self.mux_link.split("/")[-1].split("?")[0]
+                                    or "mux_file"
+                                )
                                 mux_file = ospath.join(mux_path, filename)
                                 async with aiopen(mux_file, "wb") as f:
                                     async for chunk in response.aiter_bytes():
@@ -622,7 +640,9 @@ class Encode(TaskListener):
                 vf.append("scale=-2:360")
 
         if self.watermark_text:
-            vf.append(f"drawtext=text='{self.watermark_text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=24:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2")
+            vf.append(
+                f"drawtext=text='{self.watermark_text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=24:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2"
+            )
 
         if vf:
             cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
@@ -645,10 +665,14 @@ class Encode(TaskListener):
             keep_audio = [idx for idx, k in self.audio_map.items() if k]
             keep_sub = [idx for idx, k in self.sub_map.items() if k]
             if keep_audio:
-                cmd.extend(["-map", f"0:{keep_audio[0]}", "-c:a", "copy", "-vn", "-sn"])
-                self.mode = "mp3" # Default extract audio to mp3? maybe m4a
+                cmd.extend(
+                    ["-map", f"0:{keep_audio[0]}", "-c:a", "copy", "-vn", "-sn"]
+                )
+                self.mode = "mp3"  # Default extract audio to mp3? maybe m4a
             elif keep_sub:
-                cmd.extend(["-map", f"0:{keep_sub[0]}", "-c:s", "copy", "-vn", "-an"])
+                cmd.extend(
+                    ["-map", f"0:{keep_sub[0]}", "-c:s", "copy", "-vn", "-an"]
+                )
                 self.mode = "srt"
         elif self.has_metadata_selection:
             cmd.extend(["-map", "0:v"])
@@ -660,14 +684,25 @@ class Encode(TaskListener):
                     cmd.extend(["-map", f"0:{idx}"])
             cmd.extend(["-c:a", "copy", "-c:s", "copy"])
         else:
-            if self.remove_audio: cmd.append("-an")
-            else: cmd.extend(["-c:a", "copy"])
-            if self.remove_subs: cmd.append("-sn")
-            else: cmd.extend(["-c:s", "copy"])
+            if self.remove_audio:
+                cmd.append("-an")
+            else:
+                cmd.extend(["-c:a", "copy"])
+            if self.remove_subs:
+                cmd.append("-sn")
+            else:
+                cmd.extend(["-c:s", "copy"])
 
         # Output Setup
-        out_ext = self.mode if self.mode in ["mp4", "mkv", "mov", "avi", "webm", "mp3", "srt"] else ospath.splitext(file_path)[1][1:]
-        out_name = self.new_name or f"{ospath.splitext(ospath.basename(file_path))[0]}_processed.{out_ext}"
+        out_ext = (
+            self.mode
+            if self.mode in ["mp4", "mkv", "mov", "avi", "webm", "mp3", "srt"]
+            else ospath.splitext(file_path)[1][1:]
+        )
+        out_name = (
+            self.new_name
+            or f"{ospath.splitext(ospath.basename(file_path))[0]}_processed.{out_ext}"
+        )
         if not out_name.lower().endswith(f".{out_ext.lower()}"):
             out_name = f"{ospath.splitext(out_name)[0]}.{out_ext}"
 
@@ -677,8 +712,10 @@ class Encode(TaskListener):
         res = await ffmpeg.metadata_watermark_cmds(cmd, file_path)
         if res:
             try:
-                if await aiopath.exists(file_path): await remove(file_path)
-                if mux_file and await aiopath.exists(mux_file): await remove(mux_file)
+                if await aiopath.exists(file_path):
+                    await remove(file_path)
+                if mux_file and await aiopath.exists(mux_file):
+                    await remove(mux_file)
                 self.name = out_name
             except Exception as e:
                 LOGGER.error(f"Error Cleanup: {e}")

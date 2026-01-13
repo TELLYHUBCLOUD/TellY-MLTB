@@ -584,14 +584,11 @@ class Encode(TaskListener):
                     if msg:
                         if isinstance(msg, list):
                             # It's a range, get the actual message for the first link
-                            msg, client = await get_tg_link_message(msg[0], self.user_id)
+                            msg, client = await get_tg_link_message(
+                                msg[0], self.user_id
+                            )
 
-                        media = (
-                            msg.document
-                            or msg.video
-                            or msg.audio
-                            or msg.voice
-                        )
+                        media = msg.document or msg.video or msg.audio or msg.voice
                         if media:
                             mux_file = await client.download_media(media, mux_path)
                             if mux_file:
@@ -613,9 +610,7 @@ class Encode(TaskListener):
                     async with AsyncClient(
                         follow_redirects=True, verify=False
                     ) as client:
-                        async with client.stream(
-                            "GET", self.mux_link
-                        ) as response:
+                        async with client.stream("GET", self.mux_link) as response:
                             if response.status_code == 200:
                                 filename = (
                                     self.mux_link.split("/")[-1].split("?")[0]
@@ -625,9 +620,13 @@ class Encode(TaskListener):
                                 async with aiopen(mux_file, "wb") as f:
                                     async for chunk in response.aiter_bytes():
                                         await f.write(chunk)
-                                LOGGER.info(f"MUX secondary URL file downloaded: {mux_file}")
+                                LOGGER.info(
+                                    f"MUX secondary URL file downloaded: {mux_file}"
+                                )
                             else:
-                                LOGGER.error(f"MUX URL HTTP Error: {response.status_code}")
+                                LOGGER.error(
+                                    f"MUX URL HTTP Error: {response.status_code}"
+                                )
                 except Exception as e:
                     LOGGER.error(f"MUX URL Download Error: {e}")
 

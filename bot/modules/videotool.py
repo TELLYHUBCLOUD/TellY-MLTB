@@ -581,31 +581,37 @@ class Encode(TaskListener):
                     msg, client = await get_tg_link_message(
                         self.mux_link, self.user_id
                     )
-                    if msg:
-                        if isinstance(msg, list):
-                            # It's a range, get the actual message for the first link
-                            msg, client = await get_tg_link_message(msg[0], self.user_id)
+                    if not msg:
+                        await self.on_upload_error("MUX TG Download Error: Message not found or access denied.")
+                        return
 
-                        media = (
-                            msg.document
-                            or msg.video
-                            or msg.audio
-                            or msg.voice
-                        )
-                        if media:
-                            mux_file = await client.download_media(media, mux_path)
-                            if mux_file:
-                                LOGGER.info(
-                                    f"MUX secondary file downloaded: {mux_file}"
-                                )
-                            else:
-                                LOGGER.error("MUX TG Download returned None")
+                    if isinstance(msg, list):
+                        msg, client = await get_tg_link_message(msg[0], self.user_id)
+                        if not msg:
+                            await self.on_upload_error("MUX TG Download Error: Could not resolve first link in range.")
+                            return
+
+                    media = (
+                        msg.document
+                        or msg.video
+                        or msg.audio
+                        or msg.voice
+                    )
+                    if media:
+                        mux_file = await client.download_media(media, mux_path)
+                        if mux_file:
+                            LOGGER.info(
+                                f"MUX secondary file downloaded: {mux_file}"
+                            )
                         else:
-                            LOGGER.error("MUX TG: No media found in message")
+                            await self.on_upload_error("MUX TG Download Error: client.download_media returned None.")
+                            return
                     else:
-                        LOGGER.error("MUX TG: Message not found")
+                        await self.on_upload_error("MUX TG Download Error: No media (video/audio/sub) found in the provided Telegram link.")
+                        return
                 except Exception as e:
-                    LOGGER.error(f"MUX TG Download Error: {e}")
+                    await self.on_upload_error(f"MUX TG Download Error: {e}")
+                    return
             elif is_url(self.mux_link):
                 try:
                     from httpx import AsyncClient
@@ -625,11 +631,15 @@ class Encode(TaskListener):
                                 async with aiopen(mux_file, "wb") as f:
                                     async for chunk in response.aiter_bytes():
                                         await f.write(chunk)
-                                LOGGER.info(f"MUX secondary URL file downloaded: {mux_file}")
                             else:
-                                LOGGER.error(f"MUX URL HTTP Error: {response.status_code}")
+                                await self.on_upload_error(f"MUX URL HTTP Error: {response.status_code}")
+                                return
                 except Exception as e:
-                    LOGGER.error(f"MUX URL Download Error: {e}")
+                    await self.on_upload_error(f"MUX URL Download Error: {e}")
+                    return
+            else:
+                await self.on_upload_error("MUX Error: Invalid link provided. Must be a Telegram link or a direct URL.")
+                return
 
         ffmpeg = FFMpeg(self)
         async with task_dict_lock:

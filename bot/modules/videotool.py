@@ -623,24 +623,24 @@ class Encode(TaskListener):
                 try:
                     from httpx import AsyncClient
 
-                    async with AsyncClient(
-                        follow_redirects=True, verify=False
-                    ) as client:
-                        async with client.stream("GET", self.mux_link) as response:
-                            if response.status_code == 200:
-                                filename = (
-                                    self.mux_link.split("/")[-1].split("?")[0]
-                                    or "mux_file"
-                                )
-                                mux_file = ospath.join(mux_path, filename)
-                                async with aiopen(mux_file, "wb") as f:
-                                    async for chunk in response.aiter_bytes():
-                                        await f.write(chunk)
-                            else:
-                                await self.on_upload_error(
-                                    f"MUX URL HTTP Error: {response.status_code}"
-                                )
-                                return
+                    async with (
+                        AsyncClient(follow_redirects=True, verify=False) as client,
+                        client.stream("GET", self.mux_link) as response,
+                    ):
+                        if response.status_code == 200:
+                            filename = (
+                                self.mux_link.split("/")[-1].split("?")[0]
+                                or "mux_file"
+                            )
+                            mux_file = ospath.join(mux_path, filename)
+                            async with aiopen(mux_file, "wb") as f:
+                                async for chunk in response.aiter_bytes():
+                                    await f.write(chunk)
+                        else:
+                            await self.on_upload_error(
+                                f"MUX URL HTTP Error: {response.status_code}"
+                            )
+                            return
                 except Exception as e:
                     await self.on_upload_error(f"MUX URL Download Error: {e}")
                     return

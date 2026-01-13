@@ -34,17 +34,23 @@ handler_dict = {}
 no_thumb = "https://graph.org/file/73ae908d18c6b38038071.jpg"
 
 leech_options = [
-    "THUMBNAIL",
     "LEECH_SPLIT_SIZE",
     "LEECH_FILENAME_PREFIX",
     "LEECH_FILENAME_CAPTION",
     "THUMBNAIL_LAYOUT",
+    "THUMBNAIL",
+    "AUTO_THUMBNAIL",
+    "AUTO_THUMBNAIL_TYPE",
+    "TMDB_API_KEY",
     "USER_DUMP",
     "USER_SESSION",
 ]
 rclone_options = ["RCLONE_CONFIG", "RCLONE_PATH", "RCLONE_FLAGS"]
 gdrive_options = ["TOKEN_PICKLE", "GDRIVE_ID", "INDEX_URL"]
 gofile_options = ["GOFILE_TOKEN", "GOFILE_FOLDER_ID"]
+buzzheavier_options = ["BUZZHEAVIER_TOKEN", "BUZZHEAVIER_FOLDER_ID"]
+pixeldrain_options = ["PIXELDRAIN_KEY"]
+lulustream_options = ["LULUSTREAM_KEY"]
 
 
 async def get_user_settings(from_user, stype="main"):
@@ -136,6 +142,32 @@ async def get_user_settings(from_user, stype="main"):
         else:
             thumb_layout = "None"
 
+        if user_dict.get("AUTO_THUMBNAIL", False) or (
+            "AUTO_THUMBNAIL" not in user_dict and Config.AUTO_THUMBNAIL
+        ):
+            buttons.data_button(
+                "Disable Auto Thumbnail",
+                f"userset {user_id} tog AUTO_THUMBNAIL f",
+            )
+            auto_thumb = "Enabled"
+        else:
+            buttons.data_button(
+                "Enable Auto Thumbnail",
+                f"userset {user_id} tog AUTO_THUMBNAIL t",
+            )
+            auto_thumb = "Disabled"
+
+        buttons.data_button(
+            "TMDB API Key",
+            f"userset {user_id} menu TMDB_API_KEY",
+        )
+        tmdb_api = (
+            user_dict.get("TMDB_API_KEY", Config.TMDB_API_KEY)
+            if user_dict.get("TMDB_API_KEY") or Config.TMDB_API_KEY
+            else "Not Set"
+        )
+        auto_thumb_type = user_dict.get("AUTO_THUMBNAIL_TYPE") or Config.AUTO_THUMBNAIL_TYPE
+
         buttons.data_button("Back", f"userset {user_id} back")
         buttons.data_button("Close", f"userset {user_id} close")
 
@@ -147,6 +179,9 @@ Leech Caption is <code>{escape(lcap)}</code>
 User session is {usess}
 User dump <code>{udump}</code>
 Thumbnail Layout is <b>{thumb_layout}</b>
+Auto Thumbnail is <b>{auto_thumb}</b>
+Auto Thumbnail Type is <b>{auto_thumb_type.capitalize()}</b>
+TMDB API Key is <code>{tmdb_api}</code>
 """
     elif stype == "rclone":
         buttons.data_button("Rclone Config", f"userset {user_id} menu RCLONE_CONFIG")
@@ -223,14 +258,61 @@ Stop Duplicate is <b>{sd_msg}</b>"""
         text = f"""<u>GoFile Settings for {name}</u>
 GoFile Token is <b>{gofile_token}</b>
 GoFile Folder ID is <code>{gofile_folder}</code>"""
+    elif stype == "buzzheavier":
+        buttons.data_button("BuzzHeavier Token", f"userset {user_id} menu BUZZHEAVIER_TOKEN")
+        buttons.data_button("Folder ID", f"userset {user_id} menu BUZZHEAVIER_FOLDER_ID")
+        buttons.data_button("Back", f"userset {user_id} back")
+        buttons.data_button("Close", f"userset {user_id} close")
+
+        bh_token = "Set" if user_dict.get("BUZZHEAVIER_TOKEN", False) else "Not Set"
+        bh_folder = user_dict.get("BUZZHEAVIER_FOLDER_ID", "None") or "None"
+
+        text = f"""<u>BuzzHeavier Settings for {name}</u>
+BuzzHeavier Token is <b>{bh_token}</b>
+BuzzHeavier Folder ID is <code>{bh_folder}</code>"""
+    elif stype == "pixeldrain":
+        buttons.data_button("PixelDrain Key", f"userset {user_id} menu PIXELDRAIN_KEY")
+        buttons.data_button("Back", f"userset {user_id} back")
+        buttons.data_button("Close", f"userset {user_id} close")
+
+        pd_key = "Set" if user_dict.get("PIXELDRAIN_KEY", False) else "Not Set"
+        text = f"<u>PixelDrain Settings for {name}</u>\nPixelDrain API Key is <b>{pd_key}</b>"
+    elif stype == "lulustream":
+        buttons.data_button("LuluStream Key", f"userset {user_id} menu LULUSTREAM_KEY")
+        buttons.data_button("Back", f"userset {user_id} back")
+        buttons.data_button("Close", f"userset {user_id} close")
+
+        ls_key = "Set" if user_dict.get("LULUSTREAM_KEY", False) else "Not Set"
+        text = f"<u>LuluStream Settings for {name}</u>\nLuluStream API Key is <b>{ls_key}</b>"
+    elif stype == "uphoster":
+        buttons.data_button("Gdrive", f"userset {user_id} gdrive")
+        buttons.data_button("Rclone", f"userset {user_id} rclone")
+        buttons.data_button("GoFile", f"userset {user_id} gofile")
+        buttons.data_button("BuzzHeavier", f"userset {user_id} buzzheavier")
+        buttons.data_button("PixelDrain", f"userset {user_id} pixeldrain")
+        buttons.data_button("LuluStream", f"userset {user_id} lulustream")
+        buttons.data_button("Back", f"userset {user_id} back")
+        buttons.data_button("Close", f"userset {user_id} close")
+        text = f"<u>Uphoster Settings for {name}</u>\nConfigure your upload destinations and API keys."
     elif stype == "upload_dest":
         buttons.data_button("Gdrive", f"userset {user_id} set_upload gd")
         buttons.data_button("Rclone", f"userset {user_id} set_upload rc")
         buttons.data_button("GoFile", f"userset {user_id} set_upload gofile")
+        buttons.data_button("BuzzHeavier", f"userset {user_id} set_upload bh")
+        buttons.data_button("PixelDrain", f"userset {user_id} set_upload pd")
+        buttons.data_button("LuluStream", f"userset {user_id} set_upload ls")
         buttons.data_button("YouTube", f"userset {user_id} set_upload yt")
         buttons.data_button("Back", f"userset {user_id} back")
         buttons.data_button("Close", f"userset {user_id} close")
-        text = f"<u>Upload Destination Settings for {name}</u>"
+
+        text = f"<u>Default Upload for {name}</u>\nSelect your default Mirror destination."
+    elif stype == "thumbnail_layout_menu":
+        buttons.data_button("Poster", f"userset {user_id} set_thumb_type poster")
+        buttons.data_button("Backdrop", f"userset {user_id} set_thumb_type backdrop")
+        buttons.data_button("Grid (Manual)", f"userset {user_id} set THUMBNAIL_LAYOUT")
+        buttons.data_button("Back", f"userset {user_id} leech")
+        buttons.data_button("Close", f"userset {user_id} close")
+        text = f"<u>Auto Thumbnail Settings for {name}</u>\n\nChoose the default image type for automatically fetched thumbnails.\nPoster: Portrait (2:3)\nBackdrop: Landscape (16:9)\n\n<i>Note: Grid (Manual) allows setting a custom grid layout (e.g., 3x3) for FFmpeg-generated thumbnails.</i>"
     elif stype == "youtube":
         buttons.data_button(
             "Default Privacy",
@@ -289,9 +371,52 @@ Add to Playlist ID: <code>{yt_add_to_playlist_id}</code>"""
         buttons.data_button("Back", f"userset {user_id} youtube")
         buttons.data_button("Close", f"userset {user_id} close")
         text = f"<u>Set Default YouTube Folder Upload Mode for {name}</u>"
+    elif stype == "videotools":
+        buttons.data_button("Video Quality", f"userset {user_id} menu VIDEO_QUALITY")
+        buttons.data_button("Video Extension", f"userset {user_id} menu VIDEO_EXT")
+        buttons.data_button("Watermark", f"userset {user_id} menu WATERMARK_KEY")
+        buttons.data_button("Metadata", f"userset {user_id} menu METADATA_KEY")
+
+        if user_dict.get("REMOVE_AUDIO", False) or (
+            "REMOVE_AUDIO" not in user_dict and Config.REMOVE_AUDIO
+        ):
+            buttons.data_button("Disable Remove Audio", f"userset {user_id} tog REMOVE_AUDIO f")
+            r_audio = "Enabled"
+        else:
+            buttons.data_button("Enable Remove Audio", f"userset {user_id} tog REMOVE_AUDIO t")
+            r_audio = "Disabled"
+
+        if user_dict.get("REMOVE_SUBS", False) or (
+            "REMOVE_SUBS" not in user_dict and Config.REMOVE_SUBS
+        ):
+            buttons.data_button("Disable Remove Subs", f"userset {user_id} tog REMOVE_SUBS f")
+            r_subs = "Enabled"
+        else:
+            buttons.data_button("Enable Remove Subs", f"userset {user_id} tog REMOVE_SUBS t")
+            r_subs = "Disabled"
+
+        buttons.data_button("Back", f"userset {user_id} back")
+        buttons.data_button("Close", f"userset {user_id} close")
+
+        v_qual = user_dict.get("VIDEO_QUALITY") or Config.VIDEO_QUALITY
+        v_ext = user_dict.get("VIDEO_EXT") or Config.VIDEO_EXT
+        v_wm = user_dict.get("WATERMARK_KEY") or Config.WATERMARK_KEY or "None"
+        v_md = user_dict.get("METADATA_KEY") or Config.METADATA_KEY or "None"
+
+        text = f"""<u>Video Tools Settings for {name}</u>
+<b>Video Quality:</b> {v_qual}
+<b>Video Extension:</b> {v_ext}
+<b>Watermark:</b> <code>{escape(v_wm)}</code>
+<b>Metadata:</b> <code>{escape(v_md)}</code>
+<b>Remove Audio:</b> {r_audio}
+<b>Remove Subtitles:</b> {r_subs}
+
+<i>These settings are used as defaults in the Video Tool and applied automatically when Auto VideoTool is enabled.</i>"""
     elif stype == "auto_process":
         # Auto Leech/Mirror/YT Leech settings
         auto_yt_leech = user_dict.get("AUTO_YT_LEECH", False)
+        auto_videotool = user_dict.get("AUTO_VIDEOTOOL", False)
+        auto_automerge = user_dict.get("AUTO_MERGE", False)
         auto_leech = user_dict.get("AUTO_LEECH", False)
         auto_mirror = user_dict.get("AUTO_MIRROR", False)
 
@@ -307,6 +432,32 @@ Add to Playlist ID: <code>{yt_add_to_playlist_id}</code>"""
                 f"userset {user_id} tog AUTO_YT_LEECH t",
             )
             ayt_status = "Disabled"
+
+        if auto_videotool:
+            buttons.data_button(
+                "Disable Auto VideoTool",
+                f"userset {user_id} tog AUTO_VIDEOTOOL f",
+            )
+            avt_status = "Enabled"
+        else:
+            buttons.data_button(
+                "Enable Auto VideoTool",
+                f"userset {user_id} tog AUTO_VIDEOTOOL t",
+            )
+            avt_status = "Disabled"
+
+        if auto_automerge:
+            buttons.data_button(
+                "Disable Auto Merge",
+                f"userset {user_id} tog AUTO_MERGE f",
+            )
+            amg_status = "Enabled"
+        else:
+            buttons.data_button(
+                "Enable Auto Merge",
+                f"userset {user_id} tog AUTO_MERGE t",
+            )
+            amg_status = "Disabled"
 
         if auto_leech:
             buttons.data_button(
@@ -340,14 +491,18 @@ Add to Playlist ID: <code>{yt_add_to_playlist_id}</code>"""
         text = f"""<u>Auto Processing Settings for {name}</u>
 
 <b>Auto YT Leech:</b> {ayt_status}
+<b>Auto VideoTool:</b> {avt_status}
+<b>Auto Merge:</b> {amg_status}
 <b>Auto Leech:</b> {al_status}
 <b>Auto Mirror:</b> {am_status}
 
 <i> Auto YT Leech: Automatically leech YouTube/video URLs only
+ Auto VideoTool: Automatically open Video Tool for media/links
+ Auto Merge: Automatically add media to merge session
  Auto Leech: Automatically leech ALL content (URLs + media)
  Auto Mirror: Automatically mirror ALL content (URLs + media)
 
-Priority: AUTO_YT_LEECH > AUTO_LEECH > AUTO_MIRROR
+Priority: YT_LEECH > VIDEOTOOL > MERGE > LEECH > MIRROR
 If only Auto YT Leech is enabled, only video URLs are processed.</i>"""
     elif stype == "auto_rename":
         # Auto Rename settings
@@ -413,12 +568,11 @@ If only Auto YT Leech is enabled, only video URLs are processed.</i>"""
 Automatically fetches IMDB info and renames files using the template.</i>"""
     else:
         buttons.data_button("Leech", f"userset {user_id} leech")
-        buttons.data_button("Rclone", f"userset {user_id} rclone")
-        buttons.data_button("Gdrive API", f"userset {user_id} gdrive")
-        buttons.data_button("GoFile", f"userset {user_id} gofile")
+        buttons.data_button("Uphoster", f"userset {user_id} uphoster")
         buttons.data_button("YouTube", f"userset {user_id} youtube")
         buttons.data_button("Auto Leech/Mirror", f"userset {user_id} auto_process")
         buttons.data_button("Auto Rename", f"userset {user_id} auto_rename")
+        buttons.data_button("Video Tools", f"userset {user_id} videotools")
 
         upload_paths = user_dict.get("UPLOAD_PATHS", {})
         if (
@@ -443,6 +597,12 @@ Automatically fetches IMDB info and renames files using the template.</i>"""
             du = "Rclone"
         elif default_upload == "gofile":
             du = "GoFile"
+        elif default_upload == "bh":
+            du = "BuzzHeavier"
+        elif default_upload == "pd":
+            du = "PixelDrain"
+        elif default_upload == "ls":
+            du = "LuluStream"
         else:
             du = "YouTube"
 
@@ -495,21 +655,7 @@ Automatically fetches IMDB info and renames files using the template.</i>"""
         else:
             ffc = "None"
 
-        buttons.data_button("Watermark", f"userset {user_id} menu WATERMARK_KEY")
-        if user_dict.get("WATERMARK_KEY", False):
-            wmt = user_dict["WATERMARK_KEY"]
-        elif "WATERMARK_KEY" not in user_dict and Config.WATERMARK_KEY:
-            wmt = Config.WATERMARK_KEY
-        else:
-            wmt = "None"
 
-        buttons.data_button("Metadata", f"userset {user_id} menu METADATA_KEY")
-        if user_dict.get("METADATA_KEY", False):
-            mdt = user_dict["METADATA_KEY"]
-        elif "METADATA_KEY" not in user_dict and Config.METADATA_KEY:
-            mdt = Config.METADATA_KEY
-        else:
-            mdt = "None"
         if user_dict:
             buttons.data_button("Reset All", f"userset {user_id} reset all")
 
@@ -697,12 +843,15 @@ async def get_menu(option, message, user_id):
             buttons.data_button("Remove one", f"userset {user_id} rmone {option}")
     if option in leech_options:
         back_to = "leech"
-    elif option in rclone_options:
-        back_to = "rclone"
-    elif option in gdrive_options:
-        back_to = "gdrive"
-    elif option in gofile_options:
-        back_to = "gofile"
+    elif (
+        option in rclone_options
+        or option in gdrive_options
+        or option in gofile_options
+        or option in buzzheavier_options
+        or option in pixeldrain_options
+        or option in lulustream_options
+    ):
+        back_to = "uphoster"
     elif option in [
         "YT_DEFAULT_PRIVACY",
         "YT_DEFAULT_CATEGORY",
@@ -713,6 +862,8 @@ async def get_menu(option, message, user_id):
         back_to = "youtube"
     elif option in ["RENAME_TEMPLATE", "START_EPISODE", "START_SEASON"]:
         back_to = "auto_rename"
+    elif option in ["VIDEO_QUALITY", "VIDEO_EXT", "WATERMARK_KEY", "METADATA_KEY"]:
+        back_to = "videotools"
     else:
         back_to = "back"
     buttons.data_button("Back", f"userset {user_id} {back_to}")
@@ -843,6 +994,11 @@ async def edit_user_settings(client, query):
         "youtube",
         "auto_process",
         "auto_rename",
+        "videotools",
+        "buzzheavier",
+        "pixeldrain",
+        "lulustream",
+        "uphoster",
     ]:
         await query.answer()
         await update_user_settings(query, data[2])
@@ -850,6 +1006,8 @@ async def edit_user_settings(client, query):
         await query.answer()
         if data[3] == "YT_DEFAULT_FOLDER_MODE":
             await update_user_settings(query, "youtube_folder_mode_menu")
+        elif data[3] == "THUMBNAIL_LAYOUT":
+            await update_user_settings(query, "thumbnail_layout_menu")
         else:
             await get_menu(data[3], message, user_id)
     elif data[2] == "set_yt_folder_mode":
@@ -858,6 +1016,18 @@ async def edit_user_settings(client, query):
         update_user_ldata(user_id, "YT_DEFAULT_FOLDER_MODE", new_mode)
         await database.update_user_data(user_id)
         await update_user_settings(query, "youtube")
+    elif data[2] == "set_thumb_layout":
+        await query.answer()
+        new_layout = data[3]
+        update_user_ldata(user_id, "THUMBNAIL_LAYOUT", new_layout)
+        await database.update_user_data(user_id)
+        await update_user_settings(query, "leech")
+    elif data[2] == "set_thumb_type":
+        await query.answer()
+        new_type = data[3]
+        update_user_ldata(user_id, "AUTO_THUMBNAIL_TYPE", new_type)
+        await database.update_user_data(user_id)
+        await update_user_settings(query, "leech")
     elif data[2] == "tog":
         await query.answer()
         update_user_ldata(user_id, data[3], data[4] == "t")
@@ -865,10 +1035,14 @@ async def edit_user_settings(client, query):
             back_to = "gdrive"
         elif data[3] == "USER_TOKENS":
             back_to = "main"
-        elif data[3] in ["AUTO_YT_LEECH", "AUTO_LEECH", "AUTO_MIRROR"]:
+        elif data[3] in ["AUTO_YT_LEECH", "AUTO_LEECH", "AUTO_MIRROR", "AUTO_VIDEOTOOL", "AUTO_MERGE"]:
             back_to = "auto_process"
+        elif data[3] in ["REMOVE_AUDIO", "REMOVE_SUBS"]:
+            back_to = "videotools"
         elif data[3] == "AUTO_RENAME":
             back_to = "auto_rename"
+        elif data[3] == "AUTO_THUMBNAIL":
+            back_to = "leech"
         else:
             back_to = "leech"
         await update_user_settings(query, stype=back_to)

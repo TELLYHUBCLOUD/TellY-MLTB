@@ -48,3 +48,4 @@ class BotCommands:
     MergeCommand = f"merge{i}"
     MdoneCommand = [f"mdone{i}", f"md{i}"]
     VideoToolCommand = [f"videotool{i}", f"vt{i}"]
+    TeraboxCommand = f"terabox{i}"

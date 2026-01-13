@@ -482,6 +482,13 @@ Example: Set to 2 to name episodes as S02E01, S02E02...
 Valid range: 1 to 99
 Default: 1
 Timeout: 60 sec""",
+    "TMDB_API_KEY": "Send your TheMovieDB (TMDB) API Key. You can get it from tmdb.org to enable auto-thumbnailing for movies and TV shows. Timeout: 60 sec",
+    "VIDEO_QUALITY": "Set your default video quality/resolution for Video Tool conversions (e.g., 1080p, 720p, 480p, or Original). Timeout: 60 sec",
+    "VIDEO_EXT": "Set your default video container format for Video Tool conversions (e.g., mp4, mkv, mov, or Original). Timeout: 60 sec",
+    "BUZZHEAVIER_TOKEN": "Send your BuzzHeavier API Token to enable private uploads. Timeout: 60 sec",
+    "BUZZHEAVIER_FOLDER_ID": "Send your BuzzHeavier Folder ID where files should be uploaded. Timeout: 60 sec",
+    "PIXELDRAIN_KEY": "Send your PixelDrain API Key to enable authenticated uploads. Timeout: 60 sec",
+    "LULUSTREAM_KEY": "Send your LuluStream API Key to enable authenticated uploads. Timeout: 60 sec",
 }
 
 help_string = f"""

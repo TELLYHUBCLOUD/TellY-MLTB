@@ -44,10 +44,18 @@ class AutoProcessor:
             return
         user_dict = user_data.get(user_id, {})
         auto_yt_leech = user_dict.get("AUTO_YT_LEECH", False)
+        auto_videotool = user_dict.get("AUTO_VIDEOTOOL", False)
+        auto_automerge = user_dict.get("AUTO_MERGE", False)
         auto_leech = user_dict.get("AUTO_LEECH", False)
         auto_mirror = user_dict.get("AUTO_MIRROR", False)
 
-        if not (auto_yt_leech or auto_leech or auto_mirror):
+        if not (
+            auto_yt_leech
+            or auto_videotool
+            or auto_automerge
+            or auto_leech
+            or auto_mirror
+        ):
             return
         original_text = message.text
         original_caption = message.caption
@@ -90,10 +98,10 @@ class AutoProcessor:
                         regular_links.append(word)
             has_url = len(links) > 0
             has_video_url = len(video_links) > 0
-            len(regular_links) > 0
 
             if not has_media and not has_url:
                 return
+
             if auto_yt_leech and has_video_url:
                 LOGGER.info(
                     f"Auto YT Leech triggered for user {user_id}: Video URL detected"
@@ -101,6 +109,16 @@ class AutoProcessor:
                 await AutoProcessor._process_url(
                     client, message, video_links[0], is_leech=True, force_ytdlp=True
                 )
+            elif auto_videotool and (has_media or has_url):
+                LOGGER.info(
+                    f"Auto VideoTool triggered for user {user_id}: Content detected"
+                )
+                await AutoProcessor._process_videotool(client, message, links[0] if has_url else None)
+            elif auto_automerge and has_media:
+                LOGGER.info(
+                    f"Auto Merge triggered for user {user_id}: Media file detected"
+                )
+                await AutoProcessor._process_automerge(client, message)
             elif has_media and (auto_leech or auto_mirror):
                 is_leech = auto_leech  # AUTO_LEECH has priority
                 LOGGER.info(
@@ -123,6 +141,41 @@ class AutoProcessor:
                 message.text = original_text
             if original_caption is not None:
                 message.caption = original_caption
+
+    @staticmethod
+    async def _process_videotool(client, message: Message, link: str = None):
+        """
+        Process content for Video Tool.
+        """
+        from bot.modules.videotool import Encode
+
+        command_text = f"/videotool {link}" if link else "/videotool"
+        command_message = copy.copy(message)
+        command_message.text = command_text
+        command_message.caption = None
+        if not hasattr(command_message, "_client") or command_message._client is None:
+            command_message._client = client
+        if not hasattr(command_message, "client") or command_message.client is None:
+            command_message.client = client
+        command_message.reply_to_message = message if not link else None
+        
+        # Clear media attributes to avoid Mirror logic if triggered by media
+        command_message.document = None
+        command_message.photo = None
+        command_message.video = None
+        command_message.audio = None
+        
+        encoder = Encode(client, command_message, is_auto=True)
+        await encoder.new_event()
+
+    @staticmethod
+    async def _process_automerge(client, message: Message):
+        """
+        Add media to auto-merge session.
+        """
+        from bot.modules.merge import merge_session_handler
+
+        await merge_session_handler(client, message)
 
     @staticmethod
     async def _process_media(client, message: Message, is_leech: bool):
@@ -258,7 +311,7 @@ def auto_message_filter(_, __, message: Message) -> bool:
     Returns True if:
         - Message is not a command
         - Sender is not a bot
-        - User has AUTO_LEECH or AUTO_MIRROR enabled
+        - User has AUTO_LEECH or AUTO_MIRROR etc enabled
         - Message contains processable content (URLs, media)
 
     Args:
@@ -279,10 +332,20 @@ def auto_message_filter(_, __, message: Message) -> bool:
     user_id = message.from_user.id
     user_dict = user_data.get(user_id, {})
     auto_yt_leech = user_dict.get("AUTO_YT_LEECH", False)
+    auto_videotool = user_dict.get("AUTO_VIDEOTOOL", False)
+    auto_automerge = user_dict.get("AUTO_MERGE", False)
     auto_leech = user_dict.get("AUTO_LEECH", False)
     auto_mirror = user_dict.get("AUTO_MIRROR", False)
-    if not (auto_yt_leech or auto_leech or auto_mirror):
+    
+    if not (
+        auto_yt_leech
+        or auto_videotool
+        or auto_automerge
+        or auto_leech
+        or auto_mirror
+    ):
         return False
+        
     message_text = message.text or message.caption or ""
     has_url = any(
         is_url(word) or is_magnet(word) or is_telegram_link(word)
@@ -298,7 +361,8 @@ def auto_message_filter(_, __, message: Message) -> bool:
         or message.sticker
         or message.animation
     )
-    if auto_yt_leech and not (auto_leech or auto_mirror):
+    
+    if auto_yt_leech and not (auto_videotool or auto_automerge or auto_leech or auto_mirror):
         # Check if any URL is a video URL
         if has_url:
             video_domains = [
@@ -321,6 +385,7 @@ def auto_message_filter(_, __, message: Message) -> bool:
                 ):
                     return True
         return False
+        
     return has_url or has_media
 
 

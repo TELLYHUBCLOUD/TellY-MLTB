@@ -4,7 +4,7 @@ from bot.helper.ext_utils.bot_utils import (
     new_task,
     sync_to_async,
 )
-from bot.helper.mirror_leech_utils.gdrive_utils.search import GoogleDriveSearch
+from bot.helper.mirror_leech_utils.uphoster_utils.gdrive_utils.search import GoogleDriveSearch
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.telegram_helper.message_utils import edit_message, send_message
 

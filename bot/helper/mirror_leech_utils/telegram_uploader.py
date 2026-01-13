@@ -104,6 +104,16 @@ class TelegramUploader:
             if "LEECH_FILENAME_CAPTION" not in self._listener.user_dict
             else ""
         )
+        self._auto_thumb = self._listener.user_dict.get("AUTO_THUMBNAIL") or (
+            Config.AUTO_THUMBNAIL
+            if "AUTO_THUMBNAIL" not in self._listener.user_dict
+            else False
+        )
+        self._auto_thumb_type = self._listener.user_dict.get("AUTO_THUMBNAIL_TYPE") or (
+            Config.AUTO_THUMBNAIL_TYPE
+            if "AUTO_THUMBNAIL_TYPE" not in self._listener.user_dict
+            else "poster"
+        )
         if self._thumb != "none" and not await aiopath.exists(self._thumb):
             self._thumb = None
 
@@ -645,6 +655,16 @@ class TelegramUploader:
         ):
             self._thumb = None
         thumb = self._thumb
+        
+        # --- AUTO THUMBNAIL LOGIC ---
+        if thumb is None and self._auto_thumb:
+            from bot.helper.ext_utils.auto_thumbnail_helper import AutoThumbnailHelper
+            thumb = await AutoThumbnailHelper.get_auto_thumbnail(
+                file, enabled=self._auto_thumb, thumb_type=self._auto_thumb_type
+            )
+            if thumb:
+                LOGGER.info(f"Auto thumbnail fetched for {file}: {thumb}")
+
         self._is_corrupted = False
         try:
             is_video, is_audio, is_image = await get_document_type(self._up_path)

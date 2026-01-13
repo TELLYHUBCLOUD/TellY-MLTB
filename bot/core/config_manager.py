@@ -67,6 +67,26 @@ class Config:
     WEB_PINCODE: bool = False
     YT_DLP_OPTIONS: ClassVar[dict[str, Any]] = {}
 
+    # Video Tool Defaults
+    VIDEO_QUALITY: str = "Original"
+    VIDEO_EXT: str = "Original"
+    REMOVE_AUDIO: bool = False
+    REMOVE_SUBS: bool = False
+
+    # Auto Thumbnail
+    AUTO_THUMBNAIL: bool = False
+    AUTO_THUMBNAIL_TYPE: str = "poster"
+    TMDB_API_KEY: str = ""
+    TMDB_ENABLED: bool = True
+    IMDB_ENABLED: bool = True
+    TMDB_LANGUAGE: str = "en-US"
+    TMDB_ADULT_CONTENT: bool = False
+    BUZZHEAVIER_TOKEN: str = ""
+    BUZZHEAVIER_FOLDER_ID: str = ""
+    PIXELDRAIN_KEY: str = ""
+    LULUSTREAM_KEY: str = ""
+    TERABOX_API_URL: str = ""
+
     # Aeon-MLTB Specific / Custom Features
     METADATA_KEY: str = ""
     WATERMARK_KEY: str = ""

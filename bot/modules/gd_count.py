@@ -1,7 +1,7 @@
 from bot.helper.ext_utils.bot_utils import new_task, sync_to_async
 from bot.helper.ext_utils.links_utils import is_gdrive_link
 from bot.helper.ext_utils.status_utils import get_readable_file_size
-from bot.helper.mirror_leech_utils.gdrive_utils.count import GoogleDriveCount
+from bot.helper.mirror_leech_utils.uphoster_utils.gdrive_utils.count import GoogleDriveCount
 from bot.helper.telegram_helper.message_utils import delete_message, send_message
 
 

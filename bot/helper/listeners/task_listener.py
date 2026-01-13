@@ -36,8 +36,8 @@ from bot.helper.ext_utils.files_utils import (
 from bot.helper.ext_utils.links_utils import is_gdrive_id
 from bot.helper.ext_utils.status_utils import get_readable_file_size
 from bot.helper.ext_utils.task_manager import check_running_tasks, start_from_queued
-from bot.helper.mirror_leech_utils.gdrive_utils.upload import GoogleDriveUpload
-from bot.helper.mirror_leech_utils.rclone_utils.transfer import RcloneTransferHelper
+from bot.helper.mirror_leech_utils.uphoster_utils.gdrive_utils.upload import GoogleDriveUpload
+from bot.helper.mirror_leech_utils.uphoster_utils.rclone_utils.transfer import RcloneTransferHelper
 from bot.helper.mirror_leech_utils.status_utils.gdrive_status import (
     GoogleDriveStatus,
 )
@@ -474,7 +474,7 @@ class TaskListener(TaskConfig):
             del yt
         elif self.up_dest == "gofile":
             LOGGER.info(f"GoFile Upload Name: {self.name}")
-            from bot.helper.mirror_leech_utils.gofile_utils.upload import (
+            from bot.helper.mirror_leech_utils.uphoster_utils.gofile_utils.upload import (
                 GoFileUpload,
             )
             from bot.helper.mirror_leech_utils.status_utils.gofile_status import (
@@ -489,6 +489,60 @@ class TaskListener(TaskConfig):
                 gofile.upload(),
             )
             del gofile
+        elif self.up_dest == "bh":
+            LOGGER.info(f"BuzzHeavier Upload Name: {self.name}")
+            from bot.helper.mirror_leech_utils.uphoster_utils.buzzheavier_utils.upload import (
+                BuzzHeavierUpload,
+            )
+            from bot.helper.mirror_leech_utils.status_utils.buzzheavier_status import (
+                BuzzHeavierStatus,
+            )
+
+            buzzheavier = BuzzHeavierUpload(self, up_path)
+            async with task_dict_lock:
+                task_dict[self.mid] = BuzzHeavierStatus(self, buzzheavier, gid, "up")
+            await gather(
+                update_status_message(self.message.chat.id),
+                buzzheavier.upload(),
+            )
+            del buzzheavier
+        elif self.up_dest == "pd":
+            LOGGER.info(f"PixelDrain Upload Name: {self.name}")
+            from bot.helper.mirror_leech_utils.uphoster_utils.pixeldrain_utils.upload import (
+                PixelDrainUpload,
+            )
+            from bot.helper.mirror_leech_utils.status_utils.pixeldrain_status import (
+                PixelDrainStatus,
+            )
+
+            pixeldrain = PixelDrainUpload(self, up_path)
+            async with task_dict_lock:
+                task_dict[self.mid] = PixelDrainStatus(self, pixeldrain, gid, "up")
+            await gather(
+                update_status_message(self.message.chat.id),
+                pixeldrain.upload(),
+            )
+            del pixeldrain
+        elif self.up_dest == "ls":
+            LOGGER.info(f"LuluStream Upload Name: {self.name}")
+            from bot.helper.mirror_leech_utils.uphoster_utils.lulustream_utils.lulustream import (
+                LuluStream,
+            )
+            from bot.helper.mirror_leech_utils.status_utils.lulustream_status import (
+                LuluStreamStatus,
+            )
+            from bot import user_data
+
+            user_dict = user_data.get(self.user_id, {})
+            lulu_key = user_dict.get("LULUSTREAM_KEY") or Config.LULUSTREAM_KEY
+            lulu = LuluStream(self, up_path, lulu_key)
+            async with task_dict_lock:
+                task_dict[self.mid] = LuluStreamStatus(self, lulu, gid, "up")
+            await gather(
+                update_status_message(self.message.chat.id),
+                lulu.upload(),
+            )
+            del lulu
         elif is_gdrive_id(self.up_dest):
             LOGGER.info(f"Uploading to Google Drive: {self.name}")
             drive = GoogleDriveUpload(self, up_path)

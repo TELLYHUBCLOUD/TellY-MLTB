@@ -16,7 +16,7 @@ from bot.helper.ext_utils.status_utils import (
     get_readable_file_size,
     get_readable_time,
 )
-from bot.helper.mirror_leech_utils.gdrive_utils.helper import GoogleDriveHelper
+from bot.helper.mirror_leech_utils.uphoster_utils.gdrive_utils.helper import GoogleDriveHelper
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.telegram_helper.message_utils import (
     delete_message,

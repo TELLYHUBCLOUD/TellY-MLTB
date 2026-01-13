@@ -2,7 +2,7 @@ from logging import getLogger
 
 from bot import drives_ids, drives_names, index_urls, user_data
 from bot.helper.ext_utils.status_utils import get_readable_file_size
-from bot.helper.mirror_leech_utils.gdrive_utils.helper import GoogleDriveHelper
+from bot.helper.mirror_leech_utils.uphoster_utils.gdrive_utils.helper import GoogleDriveHelper
 
 LOGGER = getLogger(__name__)
 

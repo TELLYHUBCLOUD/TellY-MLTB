@@ -76,23 +76,28 @@ async def select_encode_options(_, query, obj):
     elif data[1] == "mux_vs":
         await obj.get_text_input("mux_vs")
     elif data[1] == "extract":
-        await obj.streams_subbuttons()  # Extract uses stream selection for now
+        obj.is_extract = True
+        await obj.streams_subbuttons()
     elif data[1] == "remove_stream":
         await obj.streams_subbuttons()
+    elif data[1] == "rem_audio":
+        await obj.streams_subbuttons(stype="audio")
+    elif data[1] == "rem_sub":
+        await obj.streams_subbuttons(stype="subtitle")
     elif data[1] == "toggle_audio":
         index = int(data[2])
         if obj.streams:
             obj.audio_map[index] = not obj.audio_map[index]
         else:
             obj.remove_audio = not obj.remove_audio
-        await obj.streams_subbuttons()
+        await obj.streams_subbuttons(stype=obj.stype)
     elif data[1] == "toggle_sub":
         index = int(data[2])
         if obj.streams:
             obj.sub_map[index] = not obj.sub_map[index]
         else:
             obj.remove_subs = not obj.remove_subs
-        await obj.streams_subbuttons()
+        await obj.streams_subbuttons(stype=obj.stype)
     elif data[1] == "cancel":
         await edit_message(message, "Task Cancelled.")
         obj.is_cancelled = True
@@ -116,6 +121,7 @@ class EncodeSelection:
         self._reply_to = None
         self._timeout = 60
         self._start_time = time()
+        self.stype = None
 
         if streams:
             for stream in streams:
@@ -159,6 +165,8 @@ class EncodeSelection:
         buttons.data_button("Extract", "enc extract")
         buttons.data_button("Trim", "enc trim")
         buttons.data_button("Remove Stream", "enc remove_stream")
+        buttons.data_button("Remove Audio", "enc rem_audio")
+        buttons.data_button("Remove Subtitle", "enc rem_sub")
 
         buttons.data_button("Done", "enc done")
         buttons.data_button("Cancel", "enc cancel")
@@ -207,13 +215,16 @@ class EncodeSelection:
         markup = buttons.build_menu(2)
         await edit_message(self._reply_to, "Select Extension", markup)
 
-    async def streams_subbuttons(self):
+    async def streams_subbuttons(self, stype=None):
+        self.stype = stype
         buttons = ButtonMaker()
         if self.streams:
             for stream in self.streams:
                 idx = stream["index"]
                 ctype = stream["codec_type"]
                 if ctype in ["audio", "subtitle"]:
+                    if stype and ctype != stype:
+                        continue
                     lang = stream.get("tags", {}).get("language", "und")
                     icon = "✅"
                     if ctype == "audio":
@@ -228,14 +239,20 @@ class EncodeSelection:
                         f"{icon} {ctype.capitalize()}: {lang}", btn_data
                     )
         else:
-            a_icon = "❌" if self.remove_audio else "✅"
-            buttons.data_button(f"{a_icon} Audio (All)", "enc toggle_audio 0")
-            s_icon = "❌" if self.remove_subs else "✅"
-            buttons.data_button(f"{s_icon} Subs (All)", "enc toggle_sub 0")
+            if not stype or stype == "audio":
+                a_icon = "❌" if self.remove_audio else "✅"
+                buttons.data_button(f"{a_icon} Audio (All)", "enc toggle_audio 0")
+            if not stype or stype == "subtitle":
+                s_icon = "❌" if self.remove_subs else "✅"
+                buttons.data_button(f"{s_icon} Subs (All)", "enc toggle_sub 0")
 
         buttons.data_button("Back", "enc done")
+        buttons.data_button("Done", "enc done")
         markup = buttons.build_menu(1)
-        await edit_message(self._reply_to, "Select Streams to Keep", markup)
+        title = "Select Streams to Keep"
+        if stype:
+            title = f"Select {stype.capitalize()} Streams"
+        await edit_message(self._reply_to, title, markup)
 
     async def get_text_input(self, action):
         from pyrogram.filters import user
@@ -279,7 +296,8 @@ class EncodeSelection:
             elif action == "subsync":
                 self.listener.mode = f"sync_{text}"
             elif action.startswith("mux_"):
-                self.listener.options = f"mux:{text}"  # placeholder for mux logic
+                self.listener.mux_link = text
+                self.listener.mux_type = action
         except:
             pass
         finally:
@@ -302,6 +320,9 @@ class Encode(TaskListener):
         self.watermark_text = ""
         self.new_name = ""
         self.has_metadata_selection = False
+        self.mux_link = ""
+        self.mux_type = ""
+        self.is_extract = False
         super().__init__()
         self.is_leech = True
         self.bulk = []
@@ -516,25 +537,13 @@ class Encode(TaskListener):
         target_file = None
         max_size = 0
         video_extensions = {
-            ".mp4",
-            ".mkv",
-            ".avi",
-            ".mov",
-            ".webm",
-            ".flv",
-            ".wmv",
-            ".ts",
-            ".m4v",
-            ".dat",
-            ".vob",
-            ".3gp",
-            ".mpeg",
-            ".mpg",
+            ".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".ts",
+            ".m4v", ".dat", ".vob", ".3gp", ".mpeg", ".mpg"
         }
 
         for root, _, files_list in await sync_to_async(walk, self.dir):
             for file_name in files_list:
-                if file_name.endswith((".aria2", ".!qB")):
+                if file_name.endswith((".aria2", ".!qB")) or "mux" in root:
                     continue
                 ext = ospath.splitext(file_name)[1].lower()
                 if ext in video_extensions:
@@ -549,6 +558,35 @@ class Encode(TaskListener):
             return
 
         file_path = target_file
+
+        # Resolve MUX Link if present
+        mux_file = None
+        if self.mux_link:
+            mux_path = f"{self.dir}/mux/"
+            await sync_to_async(makedirs, mux_path, exist_ok=True)
+            if is_telegram_link(self.mux_link):
+                try:
+                    msg, _ = await get_tg_link_message(self.mux_link, self.user_id)
+                    if msg:
+                        media = msg.document or msg.video or msg.audio or msg.voice
+                        if media:
+                            mux_file = await TgClient.bot.download_media(media, mux_path)
+                except Exception as e:
+                    LOGGER.error(f"MUX TG Download Error: {e}")
+            elif is_url(self.mux_link):
+                try:
+                    from httpx import AsyncClient
+                    async with AsyncClient() as client:
+                        async with client.stream("GET", self.mux_link) as response:
+                            if response.status_code == 200:
+                                filename = self.mux_link.split("/")[-1].split("?")[0] or "mux_file"
+                                mux_file = ospath.join(mux_path, filename)
+                                async with aiopen(mux_file, "wb") as f:
+                                    async for chunk in response.aiter_bytes():
+                                        await f.write(chunk)
+                except Exception as e:
+                    LOGGER.error(f"MUX URL Download Error: {e}")
+
         ffmpeg = FFMpeg(self)
         async with task_dict_lock:
             if self.mid in task_dict:
@@ -560,23 +598,20 @@ class Encode(TaskListener):
         # Build FFmpeg Command
         cmd = ["xtra", "-hide_banner", "-loglevel", "error", "-progress", "pipe:1"]
 
-        # Trim Logic
+        # Input 1 (Original)
         if self.trim_start:
             cmd.extend(["-ss", self.trim_start])
         if self.trim_end:
             cmd.extend(["-to", self.trim_end])
-
         cmd.extend(["-i", file_path])
 
-        # Video Filter Logic (Scale + Watermark)
+        # Input 2 (MUX)
+        if mux_file:
+            cmd.extend(["-i", mux_file])
+
+        # Video Filter Logic
         vf = []
-        if self.quality != "Original" and self.quality not in [
-            "mp4",
-            "mkv",
-            "mov",
-            "avi",
-            "webm",
-        ]:
+        if self.quality not in ["Original", "mp4", "mkv", "mov", "avi", "webm"]:
             if self.quality == "1080p":
                 vf.append("scale=-2:1080")
             elif self.quality == "720p":
@@ -587,17 +622,35 @@ class Encode(TaskListener):
                 vf.append("scale=-2:360")
 
         if self.watermark_text:
-            vf.append(
-                f"drawtext=text='{self.watermark_text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=24:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2"
-            )
+            vf.append(f"drawtext=text='{self.watermark_text}':x=(w-text_w)/2:y=(h-text_h)/2:fontsize=24:fontcolor=white:shadowcolor=black:shadowx=2:shadowy=2")
 
         if vf:
             cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
         else:
             cmd.extend(["-c:v", "copy"])
 
-        # Mapping Streams
-        if self.has_metadata_selection:
+        # Mapping & MUX Logic
+        if self.mux_type:
+            cmd.extend(["-map", "0:v:0"])
+            if self.mux_type == "mux_vv":
+                cmd.extend(["-map", "1:v:0", "-map", "1:a?", "-map", "1:s?"])
+            elif self.mux_type == "mux_va":
+                cmd.extend(["-map", "0:a?", "-map", "1:a:0"])
+            elif self.mux_type == "mux_vs":
+                cmd.extend(["-map", "0:a?", "-map", "1:s:0"])
+            cmd.extend(["-c:a", "copy", "-c:s", "copy"])
+        elif self.is_extract:
+            cmd = ["xtra", "-hide_banner", "-loglevel", "error", "-i", file_path]
+            # Find the track to extract
+            keep_audio = [idx for idx, k in self.audio_map.items() if k]
+            keep_sub = [idx for idx, k in self.sub_map.items() if k]
+            if keep_audio:
+                cmd.extend(["-map", f"0:{keep_audio[0]}", "-c:a", "copy", "-vn", "-sn"])
+                self.mode = "mp3" # Default extract audio to mp3? maybe m4a
+            elif keep_sub:
+                cmd.extend(["-map", f"0:{keep_sub[0]}", "-c:s", "copy", "-vn", "-an"])
+                self.mode = "srt"
+        elif self.has_metadata_selection:
             cmd.extend(["-map", "0:v"])
             for idx, keep in self.audio_map.items():
                 if keep:
@@ -607,27 +660,16 @@ class Encode(TaskListener):
                     cmd.extend(["-map", f"0:{idx}"])
             cmd.extend(["-c:a", "copy", "-c:s", "copy"])
         else:
-            if self.remove_audio:
-                cmd.append("-an")
-            else:
-                cmd.extend(["-c:a", "copy"])
-            if self.remove_subs:
-                cmd.append("-sn")
-            else:
-                cmd.extend(["-c:s", "copy"])
+            if self.remove_audio: cmd.append("-an")
+            else: cmd.extend(["-c:a", "copy"])
+            if self.remove_subs: cmd.append("-sn")
+            else: cmd.extend(["-c:s", "copy"])
 
-        # Output Name
-        out_ext = (
-            self.mode
-            if self.mode in ["mp4", "mkv", "mov", "avi", "webm"]
-            else ospath.splitext(file_path)[1][1:]
-        )
-        out_name = (
-            self.new_name
-            or f"{ospath.splitext(ospath.basename(file_path))[0]}_processed"
-        )
+        # Output Setup
+        out_ext = self.mode if self.mode in ["mp4", "mkv", "mov", "avi", "webm", "mp3", "srt"] else ospath.splitext(file_path)[1][1:]
+        out_name = self.new_name or f"{ospath.splitext(ospath.basename(file_path))[0]}_processed.{out_ext}"
         if not out_name.lower().endswith(f".{out_ext.lower()}"):
-            out_name += f".{out_ext}"
+            out_name = f"{ospath.splitext(out_name)[0]}.{out_ext}"
 
         output_file = ospath.join(self.dir, out_name)
         cmd.append(output_file)
@@ -635,8 +677,8 @@ class Encode(TaskListener):
         res = await ffmpeg.metadata_watermark_cmds(cmd, file_path)
         if res:
             try:
-                if await aiopath.exists(file_path):
-                    await remove(file_path)
+                if await aiopath.exists(file_path): await remove(file_path)
+                if mux_file and await aiopath.exists(mux_file): await remove(mux_file)
                 self.name = out_name
             except Exception as e:
                 LOGGER.error(f"Error Cleanup: {e}")

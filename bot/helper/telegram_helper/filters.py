@@ -14,8 +14,13 @@ class CustomFilters:
     async def authorized_user(self, _, update):
         user = update.from_user or update.sender_chat
         uid = user.id
-        chat_id = update.chat.id
-        thread_id = update.message_thread_id if update.topic_message else None
+        msg = update if hasattr(update, "chat") else getattr(update, "message", None)
+        chat_id = msg.chat.id if msg else uid
+        thread_id = (
+            msg.message_thread_id
+            if msg and hasattr(msg, "topic_message") and msg.topic_message
+            else None
+        )
         return bool(
             uid == Config.OWNER_ID
             or (

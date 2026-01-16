@@ -11,6 +11,10 @@ __all__ = ["get_terabox_direct_link"]
 async def get_terabox_direct_link(terabox_url: str) -> dict:
     try:
         async with ClientSession() as session:
+            if not Config.TERABOX_API_URL:
+                LOGGER.error("TERABOX_API_URL is not set in config.py")
+                return {"success": False, "error": "TERABOX_API_URL is not set"}
+            
             api_url = f"{Config.TERABOX_API_URL}?url={quote(terabox_url)}"
             LOGGER.info(f"Fetching Terabox link: {api_url}")
 

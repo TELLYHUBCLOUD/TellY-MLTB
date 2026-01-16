@@ -5,7 +5,9 @@ anytree
 apscheduler
 aioaria2
 aioqbt
+beautifulsoup4
 cloudscraper
+cachetools==5.3.2
 dnspython
 ElectroCrypto
 kurigram

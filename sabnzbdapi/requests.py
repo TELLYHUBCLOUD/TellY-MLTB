@@ -20,22 +20,14 @@ class SabnzbdClient(JobFunctions):
     ):
         if HTTPX_REQUETS_ARGS is None:
             HTTPX_REQUETS_ARGS = {}
-
         self._base_url = f"{host.rstrip('/')}:{port}"
-        self._default_params = {
-            "apikey": api_key,
-            "output": "json",
-        }
-
+        self._default_params = {"apikey": api_key, "output": "json"}
         self._VERIFY_CERTIFICATE = VERIFY_CERTIFICATE
         self._RETRIES = RETRIES
         self._HTTPX_REQUETS_ARGS = HTTPX_REQUETS_ARGS
-
         self._http_session = None
-
         if not self._VERIFY_CERTIFICATE:
             disable_warnings(InsecureRequestWarning)
-
         super().__init__()
 
     def _session(self):
@@ -43,8 +35,7 @@ class SabnzbdClient(JobFunctions):
             return self._http_session
 
         transport = AsyncHTTPTransport(
-            retries=self._RETRIES,
-            verify=self._VERIFY_CERTIFICATE,
+            retries=self._RETRIES, verify=self._VERIFY_CERTIFICATE
         )
 
         self._http_session = AsyncClient(
@@ -66,45 +57,16 @@ class SabnzbdClient(JobFunctions):
     ):
         if requests_args is None:
             requests_args = {}
-
-        if params is None:
-            params = {}
-
-        # merge kwargs safely
-        params.update(kwargs)
-
         session = self._session()
-
-        try:
-            res = await session.get(
-                url="/sabnzbd/api",
-                params={**self._default_params, **params},
-                **requests_args,
-            )
-
-        except Exception as e:
-            raise APIConnectionError(f"SABnzbd connection failed: {e}")
-
-        # HTTP status validation
-        if res.status_code != 200:
-            raise APIConnectionError(
-                f"SABnzbd HTTP error {res.status_code}: {res.text[:300]}"
-            )
-
-        raw_text = res.text.strip()
-
-        # Empty response guard
-        if not raw_text:
-            raise APIConnectionError("SABnzbd returned empty response")
-
-        # JSON decode protection
-        try:
-            response = res.json()
-        except Exception as e:
-            raise APIConnectionError(
-                f"SABnzbd invalid JSON response: {e}\nRAW: {raw_text[:300]}"
-            )
-
+        params |= kwargs
+        res = await session.get(
+            url="/sabnzbd/api",
+            params={**self._default_params, **params},
+            **requests_args,
+        )
+        response = res.json()
+        if response is None:
+            raise APIConnectionError("Failed to connect to API!")
         return response
 
     async def close(self):

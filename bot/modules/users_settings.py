@@ -688,6 +688,9 @@ Automatically fetches IMDB info and renames files using the template.</i>"""
             "RENAME_TEMPLATE", "S{season}E{episode}Q{quality}"
         )
 
+        mdt = user_dict.get("METADATA_KEY") or Config.METADATA_KEY or "None"
+        wmt = user_dict.get("WATERMARK_KEY") or Config.WATERMARK_KEY or "None"
+
         text = f"""<u>Settings for {name}</u>
 Default Package is <b>{du}</b>
 Use <b>{tr}</b> token/config

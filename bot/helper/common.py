@@ -57,8 +57,8 @@ from .ext_utils.media_utils import (
     is_mkv,
     take_ss,
 )
-from .mirror_leech_utils.gdrive_utils.list import GoogleDriveList
-from .mirror_leech_utils.rclone_utils.list import RcloneList
+from .mirror_leech_utils.uphoster_utils.gdrive_utils.list import GoogleDriveList
+from .mirror_leech_utils.uphoster_utils.rclone_utils.list import RcloneList
 from .mirror_leech_utils.status_utils.ffmpeg_status import FFmpegStatus
 from .mirror_leech_utils.status_utils.sevenz_status import SevenZStatus
 from .telegram_helper.message_utils import (

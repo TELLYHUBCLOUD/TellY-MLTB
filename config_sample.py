@@ -21,12 +21,13 @@ STREAMWISH_API = ""
 EXCLUDED_EXTENSIONS = (
     ""  # Space separated file extensions to exclude (e.g., .log .exe)
 )
+INCLUDED_EXTENSIONS = ""
 INCOMPLETE_TASK_NOTIFIER = (
     False  # Notify for incomplete tasks on restart (requires DATABASE_URL)
 )
 YT_DLP_OPTIONS = {}  # Dictionary of yt-dlp options, e.g., {"format": "bestvideo+bestaudio/best"}
 USE_SERVICE_ACCOUNTS = False
-NAME_SUBSTITUTE = ""  # Replace/remove words: "source1/target1|source2/target2"
+NAME_SUBSTITUTE = r""  # Replace/remove words: "source1/target1|source2/target2"
 FFMPEG_CMDS = {}  # Predefined FFmpeg commands, e.g., {"preset_name": ["-vf", "scale=1280:-1"]}
 UPLOAD_PATHS = {}  # Named upload paths, e.g., {"movies": "remote:movies/", "tv": "gdrive_id_tv_folder"}
 
@@ -44,6 +45,7 @@ LEECH_FILENAME_CAPTION = ""  # Template caption for leeched files
 HYDRA_IP = ""  # IP of NZBHydra2 instance
 HYDRA_API_KEY = ""  # API key for NZBHydra2
 INSTADL_API = ""  # URL/endpoint for InstaDL API
+NAME_PREFIX = ""
 
 # GDrive Tools
 GDRIVE_ID = ""  # Default Google Drive Folder/TeamDrive ID or "root"
@@ -83,9 +85,9 @@ USENET_SERVERS = [  # List of Usenet server configurations
 
 # Update
 UPSTREAM_REPO = (
-    "https://github.com/AeonOrg/Aeon-MLTB"  # Upstream repository for updates
+    ""  # Upstream repository for updates
 )
-UPSTREAM_BRANCH = "main"  # Default branch for updates
+UPSTREAM_BRANCH = ""  # Default branch for updates
 
 # Leech
 LEECH_SPLIT_SIZE = 2097152000  # Split size for leeched files in bytes. Default: 2GB. Max: 4GB for Premium, 2GB for others. 0 for bot default.
@@ -95,7 +97,7 @@ USER_TRANSMISSION = False  # Use user session for uploads/downloads (Premium onl
 HYBRID_LEECH = (
     False  # Switch between bot/user session based on file size (Premium only)
 )
-LEECH_FILENAME_PREFIX = ""  # Prefix for leeched filenames
+LEECH_FILENAME_SUFFIX = ""  # Suffix for leeched filenames
 LEECH_DUMP_CHAT = []  # List of chat_ids or channel_ids to dump leeched files, e.g., [-100123456789, "channel_username"]
 THUMBNAIL_LAYOUT = ""  # Thumbnail layout for uploads (e.g., 2x2, 3x3)
 

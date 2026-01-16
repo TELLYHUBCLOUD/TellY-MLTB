@@ -1,7 +1,9 @@
 # ruff: noqa: E402
-from uvloop import install
-
-install()
+try:
+    from uvloop import install
+    install()
+except ImportError:
+    pass
 
 import os
 import subprocess
@@ -22,7 +24,11 @@ from time import time
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pytz import timezone
-from uvloop import install
+try:
+    from uvloop import install
+    install()
+except ImportError:
+    pass
 
 from sabnzbdapi import SabnzbdClient
 
@@ -115,24 +121,27 @@ sabnzbd_client = SabnzbdClient(
     api_key="mltb",
     port="8070",
 )
-subprocess.run(["xnox", "-d", f"--profile={os.getcwd()}"], check=False)
-subprocess.run(
-    [
-        "xnzb",
-        "-f",
-        "sabnzbd/SABnzbd.ini",
-        "-s",
-        ":::8070",
-        "-b",
-        "0",
-        "-d",
-        "-c",
-        "-l",
-        "0",
-        "--console",
-    ],
-    check=False,
-)
+try:
+    subprocess.run(["xnox", "-d", f"--profile={os.getcwd()}"], check=False)
+    subprocess.run(
+        [
+            "xnzb",
+            "-f",
+            "sabnzbd/SABnzbd.ini",
+            "-s",
+            ":::8070",
+            "-b",
+            "0",
+            "-d",
+            "-c",
+            "-l",
+            "0",
+            "--console",
+        ],
+        check=False,
+    )
+except FileNotFoundError:
+    pass
 
 
 scheduler = AsyncIOScheduler(event_loop=bot_loop)

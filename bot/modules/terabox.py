@@ -3,7 +3,8 @@ import contextlib
 from pyrogram.filters import command
 from pyrogram.handlers import MessageHandler
 
-from bot import LOGGER, bot
+from bot import LOGGER
+from bot.core.aeon_client import TgClient
 from bot.helper.aeon_utils.terabox_helper import get_terabox_direct_link
 from bot.helper.ext_utils.bot_utils import new_task
 from bot.helper.telegram_helper.filters import CustomFilters
@@ -95,7 +96,7 @@ async def terabox_handler(client, message):
             )
 
 
-bot.add_handler(
+TgClient.bot.add_handler(
     MessageHandler(
         terabox_handler, filters=command("terabox") & CustomFilters.authorized
     )

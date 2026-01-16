@@ -84,9 +84,7 @@ USENET_SERVERS = [  # List of Usenet server configurations
 ]
 
 # Update
-UPSTREAM_REPO = (
-    ""  # Upstream repository for updates
-)
+UPSTREAM_REPO = ""  # Upstream repository for updates
 UPSTREAM_BRANCH = ""  # Default branch for updates
 
 # Leech

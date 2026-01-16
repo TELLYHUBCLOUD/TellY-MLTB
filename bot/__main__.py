@@ -86,7 +86,7 @@ async def main():
     from .core.jdownloader_booter import jdownloader
     from .helper.ext_utils.files_utils import clean_all
     from .helper.ext_utils.telegraph_helper import telegraph
-    from .helper.mirror_leech_utils.rclone_utils.serve import rclone_serve_booter
+    from .helper.mirror_leech_utils.uphoster_utils.rclone_utils.serve import rclone_serve_booter
     from .modules import (
         get_packages_version,
         initiate_search_tools,

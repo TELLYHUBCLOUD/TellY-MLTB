@@ -173,14 +173,14 @@ class TMDBHelper:
         }
         if year:
             params["year" if mtype == "movie" else "first_air_date_year"] = year
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                f"{cls.BASE_URL}/search/{mtype}", params=params
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    if data.get("results"):
-                        return data["results"][0]
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(f"{cls.BASE_URL}/search/{mtype}", params=params) as resp,
+        ):
+            if resp.status == 200:
+                data = await resp.json()
+                if data.get("results"):
+                    return data["results"][0]
         return None
 
     @classmethod

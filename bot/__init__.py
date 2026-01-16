@@ -1,6 +1,6 @@
-# ruff: noqa: E402
 try:
     from uvloop import install
+
     install()
 except ImportError:
     pass
@@ -24,8 +24,10 @@ from time import time
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pytz import timezone
+
 try:
     from uvloop import install
+
     install()
 except ImportError:
     pass

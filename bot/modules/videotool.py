@@ -743,7 +743,14 @@ class Encode(TaskListener):
 
         # Get Codec Info for Bitstream Filter
         codecs = await get_codec_info(file_path)
-        v_codec = next((c for c in codecs if c not in ["aac", "ac3", "mp3", "opus", "srt", "ass"]), "h264")
+        next(
+            (
+                c
+                for c in codecs
+                if c not in ["aac", "ac3", "mp3", "opus", "srt", "ass"]
+            ),
+            "h264",
+        )
 
         # Video Filter Logic
         vf = []

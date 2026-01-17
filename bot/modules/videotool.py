@@ -77,8 +77,6 @@ async def select_encode_options(_, query, obj):
         await obj.get_text_input("mux_va")
     elif data[1] == "mux_vs":
         await obj.get_text_input("mux_vs")
-    elif data[1] == "mux_tag_cc":
-        await obj.get_text_input("mux_tag_cc")
     elif data[1] == "extract":
         obj.is_extract = True
         await obj.streams_subbuttons()
@@ -167,7 +165,6 @@ class EncodeSelection:
         buttons.data_button("Video + Video", "enc mux_vv")
         buttons.data_button("Video + Audio", "enc mux_va")
         buttons.data_button("Video + Subtitle", "enc mux_vs")
-        buttons.data_button("Merge Tag CC", "enc mux_tag_cc")
         buttons.data_button("SubSync", "enc subsync")
         buttons.data_button("Compress", "enc compress")
         buttons.data_button("Convert", "enc convert")
@@ -277,7 +274,6 @@ class EncodeSelection:
             "mux_vv": "Send the Telegram link or reply to the second Video file:",
             "mux_va": "Send the Telegram link or reply to the Audio file:",
             "mux_vs": "Send the Telegram link or reply to the Subtitle file:",
-            "mux_tag_cc": "Send the Telegram link or reply to the Subtitle file (Metadata Tag will be applied):",
         }.get(action, "Send input:")
 
         await edit_message(self._reply_to, prompt)
@@ -802,7 +798,7 @@ class Encode(TaskListener):
                 )
             elif self.mux_type == "mux_va":
                 cmd.extend(["-map", "0:a?", "-map", "1:a:0", "-map", "0:s?"])
-            elif self.mux_type in ["mux_vs", "mux_tag_cc"]:
+            elif self.mux_type == "mux_vs":
                 cmd.extend(["-map", "0:a?", "-map", "1:s:0"])
             cmd.extend(["-c:a", "copy", "-c:s", "copy"])
 

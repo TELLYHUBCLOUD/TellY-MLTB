@@ -727,6 +727,10 @@ class Encode(TaskListener):
         if not out_ext:
             out_ext = ospath.splitext(file_path)[1][1:]
 
+        # Get Codec Info for Bitstream Filter
+        codecs = await get_codec_info(file_path)
+        v_codec = next((c for c in codecs if c not in ["aac", "ac3", "mp3", "opus", "srt", "ass"]), "h264")
+
         # Video Filter Logic
         vf = []
 
@@ -776,6 +780,11 @@ class Encode(TaskListener):
                 cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
             else:
                 cmd.extend(["-c:v", "copy"])
+                if out_ext == "avi":
+                    if "h264" in codecs:
+                        cmd.extend(["-bsf:v", "h264_mp4toannexb"])
+                    elif "hevc" in codecs:
+                        cmd.extend(["-bsf:v", "hevc_mp4toannexb"])
 
             cmd.extend(["-map", "0:v:0"])
 
@@ -791,6 +800,11 @@ class Encode(TaskListener):
                 cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
             else:
                 cmd.extend(["-c:v", "copy"])
+                if out_ext == "avi":
+                    if "h264" in codecs:
+                        cmd.extend(["-bsf:v", "h264_mp4toannexb"])
+                    elif "hevc" in codecs:
+                        cmd.extend(["-bsf:v", "hevc_mp4toannexb"])
 
             cmd.extend(["-map", "0:v"])
             for idx, keep in self.audio_map.items():
@@ -807,6 +821,11 @@ class Encode(TaskListener):
                 cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
             else:
                 cmd.extend(["-c:v", "copy"])
+                if out_ext == "avi":
+                    if "h264" in codecs:
+                        cmd.extend(["-bsf:v", "h264_mp4toannexb"])
+                    elif "hevc" in codecs:
+                        cmd.extend(["-bsf:v", "hevc_mp4toannexb"])
 
             if self.remove_audio:
                 cmd.append("-an")

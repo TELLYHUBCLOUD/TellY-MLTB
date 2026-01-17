@@ -321,18 +321,17 @@ class Merge(TaskListener):
                 return
 
             self.current_file_index = index + 1
-            filename = (
-                link.file_name
-                if hasattr(link, "file_name")
-                else (
-                    link.name
-                    if hasattr(link, "name")
-                    else ospath.basename(str(link))
-                )
-            )
-            self.name = (
-                f"[{self.current_file_index}/{self.total_batch_files}] {filename}"
-            )
+            filename = "None"
+            if hasattr(link, "document") and link.document:
+                filename = link.document.file_name
+            elif hasattr(link, "video") and link.video:
+                filename = link.video.file_name
+            elif hasattr(link, "audio") and link.audio:
+                filename = link.audio.file_name
+            elif isinstance(link, str):
+                filename = ospath.basename(link)
+
+            self.name = f"[{self.current_file_index}/{self.total_batch_files}] {filename}"
 
             current_path = f"{path}{index}/"
             await makedirs(current_path, exist_ok=True)

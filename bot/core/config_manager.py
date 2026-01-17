@@ -70,6 +70,7 @@ class Config:
     # Video Tool Defaults
     VIDEO_QUALITY: str = "Original"
     VIDEO_EXT: str = "Original"
+    VIDEO_CRF: int = 23
     REMOVE_AUDIO: bool = False
     REMOVE_SUBS: bool = False
 

@@ -71,6 +71,8 @@ async def select_encode_options(_, query, obj):
         await obj.get_text_input("watermark")
     elif data[1] == "metadata":
         await obj.get_text_input("metadata")
+    elif data[1] == "crf":
+        await obj.get_text_input("crf")
     elif data[1] == "subsync":
         await obj.get_text_input("subsync")
     elif data[1] == "mux_va":
@@ -118,6 +120,7 @@ class EncodeSelection:
         self.mode = user_dict.get("VIDEO_EXT") or Config.VIDEO_EXT
         self.watermark = user_dict.get("WATERMARK_KEY") or Config.WATERMARK_KEY
         self.metadata = user_dict.get("METADATA_KEY") or Config.METADATA_KEY
+        self.crf = user_dict.get("VIDEO_CRF") or Config.VIDEO_CRF
         self.audio_map = {}
         self.sub_map = {}
         self.remove_audio = user_dict.get("REMOVE_AUDIO", Config.REMOVE_AUDIO)
@@ -155,9 +158,9 @@ class EncodeSelection:
             self.listener.client.remove_handler(*handler)
 
         if self.is_cancelled:
-            return None, None, None, None
+            return None, None, None, None, None
 
-        return self.quality, self.audio_map, self.sub_map, self.mode
+        return self.quality, self.audio_map, self.sub_map, self.mode, self.crf
 
     async def main_menu(self):
         buttons = ButtonMaker()
@@ -168,6 +171,7 @@ class EncodeSelection:
         buttons.data_button("Compress", "enc compress")
         buttons.data_button("Convert", "enc convert")
         buttons.data_button("Watermark", "enc watermark")
+        buttons.data_button("CRF", "enc crf")
         buttons.data_button("Metadata", "enc metadata")
         buttons.data_button("Extract", "enc extract")
         buttons.data_button("Trim", "enc trim")
@@ -181,6 +185,7 @@ class EncodeSelection:
         msg_text = (
             f"<b>Video Tool Settings</b>\n"
             f"Quality: {self.quality}\n"
+            f"CRF: {self.crf}\n"
             f"Convert: {self.mode}\n"
             f"Timeout: {get_readable_time(self._timeout - (time() - self._start_time))}\n"
         )
@@ -268,6 +273,7 @@ class EncodeSelection:
             "rename": "Send the new name for the file:",
             "trim": "Send trim time (format: 00:00:05-00:00:10):",
             "watermark": "Send the text for the watermark:",
+            "crf": "Send the CRF value (0-51, default: 23):",
             "metadata": "Send the title for the metadata tag:",
             "subsync": "Send the sync offset (e.g. 2.5 or -1.2):",
             "mux_va": "Send the Telegram link or reply to the Audio file:",
@@ -313,6 +319,11 @@ class EncodeSelection:
                 self.listener.watermark_text = text
             elif action == "metadata":
                 self.listener.metadata = text
+            elif action == "crf":
+                try:
+                    self.listener.crf = int(text)
+                except:
+                    pass
             elif action == "subsync":
                 self.listener.subsync_offset = text
             elif action.startswith("mux_"):
@@ -344,6 +355,7 @@ class Encode(TaskListener):
         self.mux_link = ""
         self.mux_type = ""
         self.metadata = ""
+        self.crf = 23
         self.is_extract = False
         super().__init__()
         self.is_leech = kwargs.get("is_leech", True)
@@ -525,19 +537,21 @@ class Encode(TaskListener):
             selector.remove_subs = True
 
         if self.is_auto:
-            qual, map1, map2, mode = (
+            qual, map1, map2, mode, crf = (
                 selector.quality,
                 selector.audio_map,
                 selector.sub_map,
                 selector.mode,
+                selector.crf,
             )
         else:
-            qual, map1, map2, mode = await selector.get_selection()
+            qual, map1, map2, mode, crf = await selector.get_selection()
         if qual is None:
             return None
 
         self.quality = qual
         self.mode = mode if mode != "Original" else self.mode
+        self.crf = crf
         if streams:
             self.audio_map = map1
             self.sub_map = map2
@@ -777,7 +791,7 @@ class Encode(TaskListener):
         elif self.mux_type and mux_file:
             # MUX operation
             if vf:
-                cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
+                cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264", "-crf", str(self.crf)])
             else:
                 cmd.extend(["-c:v", "copy"])
                 if out_ext == "avi":
@@ -797,7 +811,7 @@ class Encode(TaskListener):
         elif self.has_metadata_selection and self.audio_map:
             # Stream selection with metadata
             if vf:
-                cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264"])
+                cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264", "-crf", str(self.crf)])
             else:
                 cmd.extend(["-c:v", "copy"])
                 if out_ext == "avi":

@@ -387,6 +387,7 @@ Add to Playlist ID: <code>{yt_add_to_playlist_id}</code>"""
         buttons.data_button("Video Quality", f"userset {user_id} menu VIDEO_QUALITY")
         buttons.data_button("Video Extension", f"userset {user_id} menu VIDEO_EXT")
         buttons.data_button("Watermark", f"userset {user_id} menu WATERMARK_KEY")
+        buttons.data_button("CRF", f"userset {user_id} menu VIDEO_CRF")
         buttons.data_button("Metadata", f"userset {user_id} menu METADATA_KEY")
 
         if user_dict.get("REMOVE_AUDIO", False) or (
@@ -421,12 +422,14 @@ Add to Playlist ID: <code>{yt_add_to_playlist_id}</code>"""
         v_qual = user_dict.get("VIDEO_QUALITY") or Config.VIDEO_QUALITY
         v_ext = user_dict.get("VIDEO_EXT") or Config.VIDEO_EXT
         v_wm = user_dict.get("WATERMARK_KEY") or Config.WATERMARK_KEY or "None"
+        v_crf = user_dict.get("VIDEO_CRF") or Config.VIDEO_CRF
         v_md = user_dict.get("METADATA_KEY") or Config.METADATA_KEY or "None"
 
         text = f"""<u>Video Tools Settings for {name}</u>
 <b>Video Quality:</b> {v_qual}
 <b>Video Extension:</b> {v_ext}
 <b>Watermark:</b> <code>{escape(v_wm)}</code>
+<b>CRF:</b> <code>{v_crf}</code>
 <b>Metadata:</b> <code>{escape(v_md)}</code>
 <b>Remove Audio:</b> {r_audio}
 <b>Remove Subtitles:</b> {r_subs}

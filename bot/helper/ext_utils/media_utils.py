@@ -485,6 +485,10 @@ class FFMpeg:
         return self._speed_raw
 
     @property
+    def speed(self):
+        return self._speed_raw
+
+    @property
     def progress_raw(self):
         return self._progress_raw
 

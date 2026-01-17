@@ -1,10 +1,10 @@
-from asyncio import Event, create_task, wait_for, TimeoutError
+import builtins
+from asyncio import Event, create_task, wait_for
 from functools import partial
 from os import makedirs
 from os import path as ospath
 from re import search as re_search
 from time import time
-from typing import Dict, List, Optional, Tuple, Union
 
 from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath
@@ -20,9 +20,8 @@ from bot.helper.ext_utils.bot_utils import (
     arg_parser,
     new_task,
     sync_to_async,
-    is_gdrive_id,
 )
-from bot.helper.ext_utils.files_utils import get_path_size, clean_download
+from bot.helper.ext_utils.files_utils import clean_download, get_path_size
 from bot.helper.ext_utils.links_utils import is_telegram_link, is_url
 from bot.helper.ext_utils.media_utils import (
     FFMpeg,
@@ -31,25 +30,29 @@ from bot.helper.ext_utils.media_utils import (
 )
 from bot.helper.ext_utils.status_utils import get_readable_time
 from bot.helper.listeners.task_listener import TaskListener
-from bot.helper.mirror_leech_utils.download_utils.aria2_download import (
-    add_aria2_download,
-)
 from bot.helper.telegram_helper.bot_commands import BotCommands
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.telegram_helper.message_utils import (
     auto_delete_message,
-    delete_links,
     delete_message,
     edit_message,
     get_tg_link_message,
     send_message,
     send_status_message,
-    get_file_info,
 )
 
 
 class EncodeSelection:
-    QUALITY_OPTIONS = ["Original", "1080p", "720p", "576p", "480p", "360p", "240p", "144p"]
+    QUALITY_OPTIONS = [
+        "Original",
+        "1080p",
+        "720p",
+        "576p",
+        "480p",
+        "360p",
+        "240p",
+        "144p",
+    ]
     CONVERT_OPTIONS = ["mp4", "mkv", "mov", "avi", "webm"]
     TIMEOUT = 120  # Increased timeout for complex operations
 
@@ -58,7 +61,7 @@ class EncodeSelection:
         self.streams = streams or []
         self.user_id = listener.user_id
         user_dict = user_data.get(self.user_id, {})
-        
+
         # Initialize settings with fallbacks to config
         self.quality = user_dict.get("VIDEO_QUALITY", Config.VIDEO_QUALITY)
         self.mode = user_dict.get("VIDEO_EXT", Config.VIDEO_EXT)
@@ -66,13 +69,19 @@ class EncodeSelection:
         self.metadata = user_dict.get("METADATA_KEY", Config.METADATA_KEY)
         self.remove_audio = user_dict.get("REMOVE_AUDIO", Config.REMOVE_AUDIO)
         self.remove_subs = user_dict.get("REMOVE_SUBS", Config.REMOVE_SUBS)
-        
+
         # Stream maps initialization
-        self.audio_map = {stream["index"]: True for stream in self.streams 
-                          if stream.get("codec_type") == "audio"}
-        self.sub_map = {stream["index"]: True for stream in self.streams 
-                        if stream.get("codec_type") == "subtitle"}
-        
+        self.audio_map = {
+            stream["index"]: True
+            for stream in self.streams
+            if stream.get("codec_type") == "audio"
+        }
+        self.sub_map = {
+            stream["index"]: True
+            for stream in self.streams
+            if stream.get("codec_type") == "subtitle"
+        }
+
         self.is_cancelled = False
         self.is_extract = False
         self.event = Event()
@@ -80,33 +89,30 @@ class EncodeSelection:
         self._start_time = time()
         self.stype = None
 
-    async def get_selection(self) -> Tuple[Optional[str], Dict, Dict, Optional[str]]:
+    async def get_selection(self) -> tuple[str | None, dict, dict, str | None]:
         """Main entry point for selection UI"""
         await self.main_menu()
         handler = self._setup_handler()
-        
+
         try:
             await wait_for(self.event.wait(), timeout=self.TIMEOUT)
-        except TimeoutError:
+        except builtins.TimeoutError:
             await self._handle_timeout()
         finally:
             self.listener.client.remove_handler(*handler)
-        
+
         if self.is_cancelled:
             await self._cleanup()
             return None, {}, {}, None
-        
+
         return self.quality, self.audio_map, self.sub_map, self.mode
 
     def _setup_handler(self):
         """Setup callback handler with proper scoping"""
         pfunc = partial(select_encode_options, obj=self)
         return self.listener.client.add_handler(
-            CallbackQueryHandler(
-                pfunc, 
-                filters=regex("^enc") & user(self.user_id)
-            ),
-            group=-1
+            CallbackQueryHandler(pfunc, filters=regex("^enc") & user(self.user_id)),
+            group=-1,
         )
 
     async def _handle_timeout(self):
@@ -114,7 +120,7 @@ class EncodeSelection:
         if self._reply_to:
             await edit_message(
                 self._reply_to,
-                "Selection timed out after 2 minutes. Task cancelled."
+                "Selection timed out after 2 minutes. Task cancelled.",
             )
             await auto_delete_message(self._reply_to, 10)
         self.is_cancelled = True
@@ -133,17 +139,17 @@ class EncodeSelection:
         buttons.data_button("SplitOptions.METADATA", "enc metadata")
         buttons.data_button("SplitOptions.TRIM", "enc trim")
         buttons.data_button("SplitOptions.RENAME", "enc rename")
-        
+
         buttons.data_button("SplitOptions.COMPRESS", "enc compress")
         buttons.data_button("SplitOptions.CONVERT", "enc convert")
-        
+
         if self.streams:
             buttons.data_button("SplitOptions.EXTRACT", "enc extract")
             buttons.data_button("SplitOptions.REMOVE_STREAM", "enc remove_stream")
         else:
             buttons.data_button("SplitOptions.REMOVE_AUDIO", "enc rem_audio")
             buttons.data_button("SplitOptions.REMOVE_SUBS", "enc rem_sub")
-        
+
         buttons.data_button("ButtonTitles.DONE", "enc done")
         buttons.data_button("ButtonTitles.CANCEL", "enc cancel")
 
@@ -155,10 +161,12 @@ class EncodeSelection:
             f"Subtitles: <code>{len(self.sub_map)}</code>\n"
             f"Remaining Time: {get_readable_time(self.TIMEOUT - (time() - self._start_time))}"
         )
-        
+
         markup = buttons.build_menu(2)
         if not self._reply_to:
-            self._reply_to = await send_message(self.listener.message, msg_text, markup)
+            self._reply_to = await send_message(
+                self.listener.message, msg_text, markup
+            )
         else:
             await edit_message(self._reply_to, msg_text, markup)
 
@@ -166,26 +174,30 @@ class EncodeSelection:
         """Generic method to render stream selection buttons"""
         buttons = ButtonMaker()
         icon_map = {"audio": "🔊", "subtitle": "💬"}
-        
+
         for stream in self.streams:
             if stream.get("codec_type") != stream_type:
                 continue
-                
+
             idx = stream["index"]
             lang = stream.get("tags", {}).get("language", "und")
-            is_active = self.audio_map.get(idx) if stream_type == "audio" else self.sub_map.get(idx)
+            is_active = (
+                self.audio_map.get(idx)
+                if stream_type == "audio"
+                else self.sub_map.get(idx)
+            )
             status_icon = "✅" if is_active else "❌"
-            
+
             buttons.data_button(
                 f"{status_icon} {icon_map[stream_type]} {lang.upper()} (#{idx})",
-                f"enc toggle_{stream_type} {idx}"
+                f"enc toggle_{stream_type} {idx}",
             )
-        
+
         buttons.data_button("ButtonTitles.BACK", "enc done")
         buttons.data_button("ButtonTitles.DONE", "enc done")
         await edit_message(self._reply_to, title, buttons.build_menu(1))
 
-    async def streams_subbuttons(self, stype: Optional[str] = None):
+    async def streams_subbuttons(self, stype: str | None = None):
         """Handle stream selection UI"""
         self.stype = stype
         if stype == "audio":
@@ -196,17 +208,19 @@ class EncodeSelection:
             # Generic stream removal menu
             buttons = ButtonMaker()
             buttons.data_button(
-                f"{'✅' if not self.remove_audio else '❌'} Remove All Audio", 
-                "enc toggle_audio 0"
+                f"{'✅' if not self.remove_audio else '❌'} Remove All Audio",
+                "enc toggle_audio 0",
             )
             buttons.data_button(
-                f"{'✅' if not self.remove_subs else '❌'} Remove All Subtitles", 
-                "enc toggle_sub 0"
+                f"{'✅' if not self.remove_subs else '❌'} Remove All Subtitles",
+                "enc toggle_sub 0",
             )
             buttons.data_button("ButtonTitles.BACK", "enc done")
-            await edit_message(self._reply_to, "Stream Removal Options", buttons.build_menu(1))
+            await edit_message(
+                self._reply_to, "Stream Removal Options", buttons.build_menu(1)
+            )
 
-    async def get_text_input(self, action: str) -> Optional[str]:
+    async def get_text_input(self, action: str) -> str | None:
         """Unified text input handler with validation"""
         prompts = {
             "rename": "Send new filename (with extension):",
@@ -217,7 +231,7 @@ class EncodeSelection:
             "mux_va": "Send Telegram link or reply to audio file:",
             "mux_vs": "Send Telegram link or reply to subtitle file:",
         }
-        
+
         validator = {
             "trim": self._validate_trim,
             "subsync": self._validate_subsync,
@@ -226,7 +240,7 @@ class EncodeSelection:
 
         await edit_message(self._reply_to, prompts[action])
         result = await self._capture_user_input(60)
-        
+
         if result:
             is_valid, value = validator(result)
             if is_valid:
@@ -234,7 +248,7 @@ class EncodeSelection:
             await send_message(self.listener.message, f"Invalid input: {value}")
         return None
 
-    async def _capture_user_input(self, timeout: int = 30) -> Optional[str]:
+    async def _capture_user_input(self, timeout: int = 30) -> str | None:
         """Generic user input capture with timeout"""
         user_input = Event()
         result = [None]
@@ -242,12 +256,12 @@ class EncodeSelection:
         async def input_handler(_, msg):
             if msg.text:
                 result[0] = msg.text.strip()
-            elif hasattr(msg, 'document') and msg.document:
+            elif hasattr(msg, "document") and msg.document:
                 result[0] = msg
-            elif hasattr(msg, 'link') and msg.link:
+            elif hasattr(msg, "link") and msg.link:
                 result[0] = msg.link
             elif msg.reply_to_message:
-                if hasattr(msg.reply_to_message, 'document'):
+                if hasattr(msg.reply_to_message, "document"):
                     result[0] = msg.reply_to_message
                 elif msg.reply_to_message.text:
                     result[0] = msg.reply_to_message.text.strip()
@@ -255,27 +269,28 @@ class EncodeSelection:
             await delete_message(msg)
 
         handler = self.listener.client.add_handler(
-            MessageHandler(input_handler, filters=user(self.user_id)),
-            group=-1
+            MessageHandler(input_handler, filters=user(self.user_id)), group=-1
         )
-        
+
         try:
             await wait_for(user_input.wait(), timeout=timeout)
             return result[0]
-        except TimeoutError:
-            await send_message(self.listener.message, "Input timed out. Operation cancelled.")
+        except builtins.TimeoutError:
+            await send_message(
+                self.listener.message, "Input timed out. Operation cancelled."
+            )
         finally:
             self.listener.client.remove_handler(*handler)
         return None
 
     # Validation methods
-    def _validate_trim(self, value: str) -> Tuple[bool, str]:
+    def _validate_trim(self, value: str) -> tuple[bool, str]:
         """Validate trim format"""
-        if not re_search(r'^(\d{2}:\d{2}:\d{2})(?:-(\d{2}:\d{2}:\d{2}))?$', value):
+        if not re_search(r"^(\d{2}:\d{2}:\d{2})(?:-(\d{2}:\d{2}:\d{2}))?$", value):
             return False, "Invalid trim format. Use HH:MM:SS or HH:MM:SS-HH:MM:SS"
         return True, value
 
-    def _validate_subsync(self, value: str) -> Tuple[bool, str]:
+    def _validate_subsync(self, value: str) -> tuple[bool, str]:
         """Validate subsync offset"""
         try:
             float(value)
@@ -283,9 +298,9 @@ class EncodeSelection:
         except ValueError:
             return False, "Invalid number format. Use decimal like 2.5 or -1.2"
 
-    def _validate_filename(self, value: str) -> Tuple[bool, str]:
+    def _validate_filename(self, value: str) -> tuple[bool, str]:
         """Validate and sanitize filename"""
-        if not value or '/' in value or '\\' in value:
+        if not value or "/" in value or "\\" in value:
             return False, "Invalid filename characters"
         return True, value
 
@@ -295,12 +310,12 @@ async def select_encode_options(_, query, obj: EncodeSelection):
     """Centralized callback handler for selection UI"""
     data = query.data.split()
     await query.answer()
-    
+
     actions = {
         "compress": obj.compress_subbuttons,
         "convert": obj.convert_subbuttons,
-        "qual": lambda: setattr(obj, 'quality', data[2]) or obj.main_menu(),
-        "conv_ext": lambda: setattr(obj, 'mode', data[2]) or obj.main_menu(),
+        "qual": lambda: setattr(obj, "quality", data[2]) or obj.main_menu(),
+        "conv_ext": lambda: setattr(obj, "mode", data[2]) or obj.main_menu(),
         "rename": partial(obj.get_text_input, "rename"),
         "trim": partial(obj.get_text_input, "trim"),
         "watermark": partial(obj.get_text_input, "watermark"),
@@ -308,21 +323,22 @@ async def select_encode_options(_, query, obj: EncodeSelection):
         "subsync": partial(obj.get_text_input, "subsync"),
         "mux_va": partial(obj.get_text_input, "mux_va"),
         "mux_vs": partial(obj.get_text_input, "mux_vs"),
-        "extract": lambda: setattr(obj, 'is_extract', True) or obj.streams_subbuttons(),
+        "extract": lambda: setattr(obj, "is_extract", True)
+        or obj.streams_subbuttons(),
         "remove_stream": obj.streams_subbuttons,
         "rem_audio": lambda: obj.streams_subbuttons("audio"),
         "rem_sub": lambda: obj.streams_subbuttons("subtitle"),
         "toggle_audio": lambda: _toggle_stream(obj, "audio", int(data[2])),
         "toggle_sub": lambda: _toggle_stream(obj, "subtitle", int(data[2])),
-        "cancel": lambda: setattr(obj, 'is_cancelled', True) or obj.event.set(),
+        "cancel": lambda: setattr(obj, "is_cancelled", True) or obj.event.set(),
         "done": lambda: obj.event.set() or delete_message(query.message),
     }
-    
+
     action = actions.get(data[1])
     if action:
         if callable(action):
             result = action()
-            if hasattr(result, '__await__'):
+            if hasattr(result, "__await__"):
                 await result
         else:
             action()
@@ -337,11 +353,10 @@ def _toggle_stream(obj: EncodeSelection, stream_type: str, index: int):
             obj.audio_map[index] = not obj.audio_map[index]
         else:
             obj.remove_audio = not obj.remove_audio
+    elif index in obj.sub_map:
+        obj.sub_map[index] = not obj.sub_map[index]
     else:
-        if index in obj.sub_map:
-            obj.sub_map[index] = not obj.sub_map[index]
-        else:
-            obj.remove_subs = not obj.remove_subs
+        obj.remove_subs = not obj.remove_subs
     create_task(obj.streams_subbuttons(obj.stype))
 
 
@@ -359,7 +374,7 @@ class Encode(TaskListener):
         self.options = ""
         self.same_dir = {}
         self.multi_tag = ""
-        
+
         # Processing options
         self.quality = kwargs.get("quality", "")
         self.remove_audio = kwargs.get("remove_audio", False)
@@ -374,7 +389,7 @@ class Encode(TaskListener):
         self.mux_type = kwargs.get("mux_type", "")
         self.metadata = kwargs.get("metadata", "")
         self.is_extract = kwargs.get("is_extract", False)
-        
+
         # Internal state
         self.audio_map = {}
         self.sub_map = {}
@@ -398,14 +413,17 @@ class Encode(TaskListener):
 
         await self._handle_multi_links(args)
         await self._resolve_input_source(args)
-        
+
         if not self.link:
-            await send_message(self.message, "No valid media source found. Provide a link or reply to media.")
+            await send_message(
+                self.message,
+                "No valid media source found. Provide a link or reply to media.",
+            )
             return
 
         await self._process_video(args)
 
-    def _parse_arguments(self) -> Dict:
+    def _parse_arguments(self) -> dict:
         """Parse command arguments with validation"""
         input_list = self.message.text.split("\n")[0].split()
         args = {
@@ -420,14 +438,16 @@ class Encode(TaskListener):
             "-b": False,
         }
         arg_parser(input_list[1:], args)
-        
+
         # Validate quality parameter
         if args["-q"] and args["-q"] not in EncodeSelection.QUALITY_OPTIONS:
-            raise ValueError(f"Invalid quality option. Choose from: {', '.join(EncodeSelection.QUALITY_OPTIONS)}")
-        
+            raise ValueError(
+                f"Invalid quality option. Choose from: {', '.join(EncodeSelection.QUALITY_OPTIONS)}"
+            )
+
         return args
 
-    async def _resolve_input_source(self, args: Dict):
+    async def _resolve_input_source(self, args: dict):
         """Resolve input source from link, reply, or bulk"""
         self.link = args["link"]
         self.name = args["-n"]
@@ -456,10 +476,10 @@ class Encode(TaskListener):
             try:
                 self.link, _ = await get_tg_link_message(self.link, self.user_id)
             except Exception as e:
-                await self._handle_error(f"Failed to resolve Telegram link: {str(e)}")
+                await self._handle_error(f"Failed to resolve Telegram link: {e!s}")
                 self.link = None
 
-    async def _process_video(self, args: Dict):
+    async def _process_video(self, args: dict):
         """Main video processing workflow"""
         media_info = await self._fetch_media_metadata()
         if not media_info:
@@ -468,17 +488,17 @@ class Encode(TaskListener):
         # Initialize selection UI
         selector = self._initialize_selector(media_info, args)
         qual, audio_map, sub_map, mode = await selector.get_selection()
-        
+
         if selector.is_cancelled:
             await clean_download(self.dir)
             return
-        
+
         # Apply selections
         self._apply_selections(selector, qual, audio_map, sub_map, mode)
         await self.before_start()
         await self._start_download()
 
-    async def _fetch_media_metadata(self) -> Optional[List[Dict]]:
+    async def _fetch_media_metadata(self) -> list[dict] | None:
         """Fetch media metadata with size constraints"""
         if not self.link:
             return None
@@ -487,18 +507,21 @@ class Encode(TaskListener):
         try:
             if isinstance(self.link, str) and is_url(self.link):
                 return await get_remote_media_info(self.link)
-            
+
             # Handle Telegram media with size check
             media = self.link.document or self.link.video or self.link.audio
             if not media:
-                await send_message(self.message, "Unsupported media type. Provide video, audio, or document.")
+                await send_message(
+                    self.message,
+                    "Unsupported media type. Provide video, audio, or document.",
+                )
                 return None
 
             if media.file_size > self.MAX_FILE_SIZE:
                 await send_message(
                     self.message,
-                    f"File too large for metadata analysis (>4GB). "
-                    f"Processing will use default settings."
+                    "File too large for metadata analysis (>4GB). "
+                    "Processing will use default settings.",
                 )
                 return None
 
@@ -506,26 +529,26 @@ class Encode(TaskListener):
         finally:
             await delete_message(wait_msg)
 
-    async def _fetch_tg_metadata(self, media) -> List[Dict]:
+    async def _fetch_tg_metadata(self, media) -> list[dict]:
         """Fetch metadata for Telegram files with partial download"""
         path = f"{DOWNLOAD_DIR}Metadata/"
         await sync_to_async(makedirs, path, exist_ok=True)
         file_path = ospath.join(path, f"{self.mid}_{media.file_name or 'metadata'}")
-        
+
         try:
             # Stream only first 5MB for metadata
             downloaded = 0
             MAX_BYTES = 5 * 1024 * 1024
-            
-            async with aiopen(file_path, 'wb') as f:
+
+            async with aiopen(file_path, "wb") as f:
                 async for chunk in TgClient.bot.stream_media(media, limit=10):
                     if downloaded + len(chunk) > MAX_BYTES:
-                        chunk = chunk[:MAX_BYTES - downloaded]
+                        chunk = chunk[: MAX_BYTES - downloaded]
                     await f.write(chunk)
                     downloaded += len(chunk)
                     if downloaded >= MAX_BYTES:
                         break
-            
+
             return await get_streams(file_path)
         finally:
             if await aiopath.exists(file_path):
@@ -534,7 +557,9 @@ class Encode(TaskListener):
     async def on_download_complete(self):
         """Post-download processing workflow"""
         if not await self._find_target_file():
-            await self.on_upload_error("No valid video file found in download directory")
+            await self.on_upload_error(
+                "No valid video file found in download directory"
+            )
             return
 
         # Handle MUX operations
@@ -548,14 +573,14 @@ class Encode(TaskListener):
             output_file = await self._process_with_ffmpeg(mux_file)
             if not output_file or not await aiopath.exists(output_file):
                 raise Exception("Processing failed - output file not created")
-            
+
             # Cleanup and proceed to upload
             await self._cleanup_temp_files(mux_file)
             self.name = ospath.basename(output_file)
             await super().on_download_complete()
         except Exception as e:
-            LOGGER.exception(f"Processing failed: {str(e)}")
-            await self.on_upload_error(f"Video processing failed: {str(e)}")
+            LOGGER.exception(f"Processing failed: {e!s}")
+            await self.on_upload_error(f"Video processing failed: {e!s}")
         finally:
             await self._cleanup_temp_files(mux_file)
 
@@ -588,38 +613,38 @@ class Encode(TaskListener):
                 async for entry in self._walk_async(ospath.join(root, name)):
                     yield entry
 
-    async def _process_with_ffmpeg(self, mux_file: Optional[str]) -> Optional[str]:
+    async def _process_with_ffmpeg(self, mux_file: str | None) -> str | None:
         """Build and execute FFmpeg command"""
         ffmpeg = FFMpeg(self)
         status = VideoToolsStatus(self, ffmpeg)
-        
+
         async with task_dict_lock:
             task_dict[self.mid] = status
-        
+
         await send_status_message(self.message)
-        
+
         cmd = self._build_ffmpeg_command(mux_file)
         output_file = ospath.join(self.dir, self._get_output_filename())
-        
+
         LOGGER.info(f"Executing FFmpeg command: {' '.join(cmd)}")
         success = await ffmpeg.execute(cmd, self.target_file, output_file)
-        
+
         if not success:
             raise Exception("FFmpeg processing failed (check logs for details)")
-        
+
         return output_file
 
-    def _build_ffmpeg_command(self, mux_file: Optional[str]) -> List[str]:
+    def _build_ffmpeg_command(self, mux_file: str | None) -> list[str]:
         """Construct FFmpeg command based on user selections"""
         cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-progress", "pipe:1"]
-        
+
         # Input handling
         if self.trim_start:
             cmd.extend(["-ss", self.trim_start])
         if self.trim_end:
             cmd.extend(["-to", self.trim_end])
         cmd.extend(["-i", self.target_file])
-        
+
         if mux_file:
             cmd.extend(["-i", mux_file])
 
@@ -627,10 +652,10 @@ class Encode(TaskListener):
         vf_filters = []
         if self.watermark_text:
             vf_filters.append(self._get_watermark_filter())
-        
+
         if self.quality not in ["Original", ""]:
             vf_filters.append(self._get_scale_filter())
-        
+
         if vf_filters:
             cmd.extend(["-vf", ",".join(vf_filters), "-c:v", "libx264"])
         else:
@@ -638,17 +663,23 @@ class Encode(TaskListener):
 
         # Stream mapping and codec selection
         cmd.extend(self._get_stream_mapping(mux_file))
-        
+
         # Metadata handling
         if self.metadata or self.tag:
             metadata = self.metadata or self.tag
-            cmd.extend([
-                "-metadata", f"title={metadata}",
-                "-metadata:s:v", f"title={metadata}",
-                "-metadata:s:a", f"title={metadata}",
-                "-metadata:s:s", f"title={metadata}"
-            ])
-        
+            cmd.extend(
+                [
+                    "-metadata",
+                    f"title={metadata}",
+                    "-metadata:s:v",
+                    f"title={metadata}",
+                    "-metadata:s:a",
+                    f"title={metadata}",
+                    "-metadata:s:s",
+                    f"title={metadata}",
+                ]
+            )
+
         # Subsync handling
         if self.subsync_offset:
             try:
@@ -656,36 +687,40 @@ class Encode(TaskListener):
                 cmd.extend(["-itsoffset", str(offset)])
             except ValueError:
                 LOGGER.warning(f"Invalid subsync offset: {self.subsync_offset}")
-        
+
         return cmd
 
     def _get_output_filename(self) -> str:
         """Generate output filename based on processing options"""
         base = ospath.splitext(ospath.basename(self.target_file))[0]
         suffix = "_processed"
-        
+
         if self.is_extract:
             suffix = "_extracted"
         elif self.trim_start or self.trim_end:
             suffix = "_trimmed"
         elif self.watermark_text:
             suffix = "_watermarked"
-        
-        ext = self.mode if self.mode in EncodeSelection.CONVERT_OPTIONS else ospath.splitext(self.target_file)[1][1:]
+
+        ext = (
+            self.mode
+            if self.mode in EncodeSelection.CONVERT_OPTIONS
+            else ospath.splitext(self.target_file)[1][1:]
+        )
         return f"{base}{suffix}.{ext}"
 
-    async def _cleanup_temp_files(self, mux_file: Optional[str]):
+    async def _cleanup_temp_files(self, mux_file: str | None):
         """Cleanup temporary files safely"""
         files_to_remove = [self.target_file]
         if mux_file:
             files_to_remove.append(mux_file)
-        
+
         for file_path in files_to_remove:
             try:
                 if await aiopath.exists(file_path):
                     await aioremove(file_path)
             except Exception as e:
-                LOGGER.warning(f"Failed to remove {file_path}: {str(e)}")
+                LOGGER.warning(f"Failed to remove {file_path}: {e!s}")
 
 
 async def videotool(client, message):
@@ -698,7 +733,7 @@ async def videotool(client, message):
             "-q <quality> : Compression quality\n"
             "-an : Remove all audio\n"
             "-sn : Remove all subtitles\n"
-            "-n <name> : Custom output name"
+            "-n <name> : Custom output name",
         )
         return
 
@@ -707,23 +742,25 @@ async def videotool(client, message):
 
 # Supporting classes
 class FileEntry:
-    __slots__ = ('path', 'name')
+    __slots__ = ("name", "path")
+
     def __init__(self, path: str, name: str):
         self.path = path
         self.name = name
-    
+
     def is_file(self) -> bool:
         return True
+
 
 class VideoToolsStatus:
     def __init__(self, listener, ffmpeg):
         self.listener = listener
         self.ffmpeg = ffmpeg
         self._processed_bytes = 0
-    
+
     def gid(self) -> str:
         return f"{self.listener.mid}{self.listener.client.me.id}"
-    
+
     async def update(self, processed: int):
         self._processed_bytes = processed
         # Update status message here if needed

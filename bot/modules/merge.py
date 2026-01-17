@@ -331,7 +331,9 @@ class Merge(TaskListener):
             elif isinstance(link, str):
                 filename = ospath.basename(link)
 
-            self.name = f"[{self.current_file_index}/{self.total_batch_files}] {filename}"
+            self.name = (
+                f"[{self.current_file_index}/{self.total_batch_files}] {filename}"
+            )
 
             current_path = f"{path}{index}/"
             await makedirs(current_path, exist_ok=True)

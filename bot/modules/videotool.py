@@ -1,3 +1,4 @@
+import contextlib
 from asyncio import Event, create_task, wait_for
 from functools import partial
 from os import makedirs, walk
@@ -320,10 +321,8 @@ class EncodeSelection:
             elif action == "metadata":
                 self.listener.metadata = text
             elif action == "crf":
-                try:
+                with contextlib.suppress(BaseException):
                     self.listener.crf = int(text)
-                except:
-                    pass
             elif action == "subsync":
                 self.listener.subsync_offset = text
             elif action.startswith("mux_"):
@@ -798,7 +797,9 @@ class Encode(TaskListener):
         elif self.mux_type and mux_file:
             # MUX operation
             if vf:
-                cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264", "-crf", str(self.crf)])
+                cmd.extend(
+                    ["-vf", ",".join(vf), "-c:v", "libx264", "-crf", str(self.crf)]
+                )
             else:
                 cmd.extend(["-c:v", "copy"])
                 if out_ext == "avi":
@@ -818,7 +819,9 @@ class Encode(TaskListener):
         elif self.has_metadata_selection and self.audio_map:
             # Stream selection with metadata
             if vf:
-                cmd.extend(["-vf", ",".join(vf), "-c:v", "libx264", "-crf", str(self.crf)])
+                cmd.extend(
+                    ["-vf", ",".join(vf), "-c:v", "libx264", "-crf", str(self.crf)]
+                )
             else:
                 cmd.extend(["-c:v", "copy"])
                 if out_ext == "avi":

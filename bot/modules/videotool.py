@@ -743,7 +743,7 @@ class Encode(TaskListener):
 
         # Get Codec Info for Bitstream Filter
         codecs = await get_codec_info(file_path)
-        next(
+        v_codec = next(
             (
                 c
                 for c in codecs

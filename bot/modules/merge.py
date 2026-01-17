@@ -331,7 +331,8 @@ class Merge(TaskListener):
             elif isinstance(link, str):
                 filename = ospath.basename(link)
 
-            self.name = f"[{self.current_file_index}/{self.total_batch_files}] {filename}"
+            self.name = filename
+            self.subname = f"[{index + 1}/{self.total_batch_files}]"
 
             current_path = f"{path}{index}/"
             await makedirs(current_path, exist_ok=True)
@@ -444,7 +445,8 @@ class Merge(TaskListener):
             name, ext = ospath.splitext(self.output_name)
             self.output_name = f"{name} {self.name_subfix}{ext}"
 
-        self.name = f"[Merge] {self.output_name}"
+        self.name = self.output_name
+        self.subname = ""
 
         # Check for ASS subtitles and adjust container
         self.name = await self._adjust_container_for_codecs(input_files)
@@ -473,18 +475,22 @@ class Merge(TaskListener):
     async def _collect_input_files(self) -> list:
         """Collect all downloaded input files."""
         input_files = []
-        for root, _, files in await sync_to_async(walk, self.dir):
-            for file in files:
-                if file != "input.txt":
-                    input_files.append(ospath.join(root, file))
+        for i in range(self.total_batch_files):
+            input_dir = ospath.join(self.dir, str(i))
+            if ospath.isdir(input_dir):
+                for root, _, files in await sync_to_async(walk, input_dir):
+                    for file in files:
+                        if not file.endswith((".aria2", ".!qB")):
+                            input_files.append(ospath.join(root, file))
         return input_files
 
     async def _create_concat_file(self, path: str, files: list):
         """Create FFMpeg concat input file."""
         with open(path, "w", encoding="utf-8") as f:
             for file in files:
-                # Escape single quotes in file path
-                escaped_path = file.replace("'", "'\\''")
+                # FFmpeg concat requires forward slashes and escaped single quotes
+                abs_path = ospath.abspath(file).replace("\\", "/")
+                escaped_path = abs_path.replace("'", "'\\''")
                 f.write(f"file '{escaped_path}'\n")
 
     async def _generate_smart_name(self, input_files: list) -> str:

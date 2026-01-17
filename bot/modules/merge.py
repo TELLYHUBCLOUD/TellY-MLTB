@@ -43,6 +43,7 @@ class Merge(TaskListener):
         self.total_batch_files = 0
         self.current_batch_files = 0
         self.output_name = ""
+        self.metadata = ""
         self.name_subfix = ""
         self.current_file_index = 0
         self._download_complete_event = None
@@ -569,10 +570,18 @@ class Merge(TaskListener):
             "0",
             "-c",
             "copy",
-            "-metadata",
-            f"title={self.name}",
-            output_file,
         ]
+
+        # Apply Metadata Tag (User tag or custom title)
+        final_metadata = self.metadata or self.tag
+        if final_metadata:
+            cmd.extend(["-metadata", f"title={final_metadata}"])
+            cmd.extend(["-metadata:s:v", f"title={final_metadata}"])
+            cmd.extend(["-metadata:s:a", f"title={final_metadata}"])
+            cmd.extend(["-metadata:s:s", f"title={final_metadata}"])
+
+        cmd.append(output_file)
+        return cmd
 
     async def _calculate_total_duration(self, input_files: list) -> float:
         """Calculate total duration of all input files."""
@@ -645,13 +654,15 @@ async def merge_done(client, message):
     # Parse arguments from /mdone command
     text = message.text.split(maxsplit=1)
     if len(text) > 1:
-        args = {"-n": "", "-up": "", "-rcf": ""}
+        args = {"-n": "", "-metadata": "", "-up": "", "-rcf": ""}
         input_args = text[1].split()
 
         if "-n" in input_args:
             arg_parser(input_args, args)
             if args["-n"]:
                 listener.output_name = args["-n"]
+            if args["-metadata"]:
+                listener.metadata = args["-metadata"]
             if args["-up"]:
                 listener.up_dest = args["-up"]
             if args["-rcf"]:

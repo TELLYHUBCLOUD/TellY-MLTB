@@ -67,6 +67,8 @@ async def select_encode_options(_, query, obj):
         await obj.get_text_input("trim")
     elif data[1] == "watermark":
         await obj.get_text_input("watermark")
+    elif data[1] == "metadata":
+        await obj.get_text_input("metadata")
     elif data[1] == "subsync":
         await obj.get_text_input("subsync")
     elif data[1] == "mux_vv":
@@ -75,6 +77,8 @@ async def select_encode_options(_, query, obj):
         await obj.get_text_input("mux_va")
     elif data[1] == "mux_vs":
         await obj.get_text_input("mux_vs")
+    elif data[1] == "mux_tag_cc":
+        await obj.get_text_input("mux_tag_cc")
     elif data[1] == "extract":
         obj.is_extract = True
         await obj.streams_subbuttons()
@@ -163,10 +167,12 @@ class EncodeSelection:
         buttons.data_button("Video + Video", "enc mux_vv")
         buttons.data_button("Video + Audio", "enc mux_va")
         buttons.data_button("Video + Subtitle", "enc mux_vs")
+        buttons.data_button("Merge Tag CC", "enc mux_tag_cc")
         buttons.data_button("SubSync", "enc subsync")
         buttons.data_button("Compress", "enc compress")
         buttons.data_button("Convert", "enc convert")
         buttons.data_button("Watermark", "enc watermark")
+        buttons.data_button("Metadata", "enc metadata")
         buttons.data_button("Extract", "enc extract")
         buttons.data_button("Trim", "enc trim")
         buttons.data_button("Remove Stream", "enc remove_stream")
@@ -266,10 +272,12 @@ class EncodeSelection:
             "rename": "Send the new name for the file:",
             "trim": "Send trim time (format: 00:00:05-00:00:10):",
             "watermark": "Send the text for the watermark:",
+            "metadata": "Send the title for the metadata tag:",
             "subsync": "Send the sync offset (e.g. 2.5 or -1.2):",
             "mux_vv": "Send the Telegram link or reply to the second Video file:",
             "mux_va": "Send the Telegram link or reply to the Audio file:",
             "mux_vs": "Send the Telegram link or reply to the Subtitle file:",
+            "mux_tag_cc": "Send the Telegram link or reply to the Subtitle file (Metadata Tag will be applied):",
         }.get(action, "Send input:")
 
         await edit_message(self._reply_to, prompt)
@@ -309,6 +317,8 @@ class EncodeSelection:
                         )
             elif action == "watermark":
                 self.listener.watermark_text = text
+            elif action == "metadata":
+                self.listener.metadata = text
             elif action == "subsync":
                 self.listener.subsync_offset = text
             elif action.startswith("mux_"):
@@ -339,6 +349,7 @@ class Encode(TaskListener):
         self.has_metadata_selection = False
         self.mux_link = ""
         self.mux_type = ""
+        self.metadata = ""
         self.is_extract = False
         super().__init__()
         self.is_leech = kwargs.get("is_leech", True)
@@ -462,7 +473,13 @@ class Encode(TaskListener):
             await send_message(self.message, "No link or reply found.")
             return None
 
-        LOGGER.info(f"Video Tool Request: Link: {self.link}")
+        if hasattr(self.link, "id"):
+            media = self.link.document or self.link.video or self.link.audio
+            link_info = f"TG Message: {self.link.id} (File: {media.file_name if media else 'Unknown'})"
+        else:
+            link_info = str(self.link)
+
+        LOGGER.info(f"Video Tool Request: Link: {link_info}")
 
         streams = []
         if (
@@ -785,7 +802,7 @@ class Encode(TaskListener):
                 )
             elif self.mux_type == "mux_va":
                 cmd.extend(["-map", "0:a?", "-map", "1:a:0", "-map", "0:s?"])
-            elif self.mux_type == "mux_vs":
+            elif self.mux_type in ["mux_vs", "mux_tag_cc"]:
                 cmd.extend(["-map", "0:a?", "-map", "1:s:0"])
             cmd.extend(["-c:a", "copy", "-c:s", "copy"])
 
@@ -829,6 +846,14 @@ class Encode(TaskListener):
                 cmd.extend(["-itsoffset", str(offset_val)])
             except ValueError:
                 LOGGER.warning(f"Invalid subsync offset: {self.subsync_offset}")
+
+        # Apply Metadata Tag if provided
+        final_metadata = self.metadata or self.tag
+        if final_metadata:
+            cmd.extend(["-metadata", f"title={final_metadata}"])
+            cmd.extend(["-metadata:s:v", f"title={final_metadata}"])
+            cmd.extend(["-metadata:s:a", f"title={final_metadata}"])
+            cmd.extend(["-metadata:s:s", f"title={final_metadata}"])
 
         # Output file setup
         out_name = (

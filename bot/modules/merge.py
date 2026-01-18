@@ -2,7 +2,8 @@ import re
 from os import path as ospath
 from os import walk
 
-from aiofiles.os import makedirs, remove
+from aiofiles.os import listdir, makedirs, remove
+from aioshutil import rmtree
 
 from bot import LOGGER, bot_loop, task_dict, task_dict_lock
 
@@ -420,6 +421,9 @@ class Merge(TaskListener):
         input_files.sort()
         LOGGER.info(f"Merging {len(input_files)} files")
 
+        # Calculate total size for byte-based status
+        self.size = sum(ospath.getsize(f) for f in input_files)
+
         # Create FFMpeg concat input file
         input_txt_path = f"{self.dir}/input.txt"
         await self._create_concat_file(input_txt_path, input_files)
@@ -467,8 +471,8 @@ class Merge(TaskListener):
         )
 
         if result:
-            # Cleanup input files
-            await self._cleanup_files(input_files, input_txt_path)
+            # Cleanup all temporary files and folders
+            await self._cleanup_files()
             await super().on_download_complete()
         else:
             await self.on_upload_error("❌ Merge Failed. Check logs for details.")
@@ -497,7 +501,11 @@ class Merge(TaskListener):
     async def _generate_smart_name(self, input_files: list) -> str:
         """Generate smart output name based on input files."""
         try:
-            input_filenames = [ospath.basename(f) for f in input_files]
+            # Strip [n/m] prefixes if present
+            input_filenames = []
+            for f in input_files:
+                name = ospath.basename(f)
+                input_filenames.append(re.sub(r"^\[\d+/\d+\]\s*", "", name))
 
             # Patterns for series detection
             pattern_se = re.compile(r"(.*?)S(\d+)\s*E(\d+)", re.IGNORECASE)
@@ -578,6 +586,8 @@ class Merge(TaskListener):
             "error",
             "-progress",
             "pipe:1",
+            "-fflags",
+            "+genpts",
             "-f",
             "concat",
             "-safe",
@@ -588,6 +598,8 @@ class Merge(TaskListener):
             "0",
             "-c",
             "copy",
+            "-movflags",
+            "+faststart",
             "-metadata",
             f"title={self.name}",
             output_file,
@@ -604,18 +616,20 @@ class Merge(TaskListener):
                 LOGGER.warning(f"Could not get duration for {file}: {e}")
         return total_duration
 
-    async def _cleanup_files(self, input_files: list, input_txt: str):
-        """Clean up temporary files after merge."""
-        for file in input_files:
+    async def _cleanup_files(self):
+        """Clean up all temporary files and folders after merge."""
+        # Only keep the output file in the download directory
+        for item in await listdir(self.dir):
+            if item == self.name:
+                continue
+            item_path = ospath.join(self.dir, item)
             try:
-                await remove(file)
+                if ospath.isdir(item_path):
+                    await sync_to_async(rmtree, item_path, ignore_errors=True)
+                else:
+                    await remove(item_path)
             except Exception as e:
-                LOGGER.warning(f"Could not remove {file}: {e}")
-
-        try:
-            await remove(input_txt)
-        except Exception as e:
-            LOGGER.warning(f"Could not remove input.txt: {e}")
+                LOGGER.warning(f"Could not remove {item_path}: {e}")
 
 
 async def merge(client, message):

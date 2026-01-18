@@ -35,7 +35,7 @@ class MergeStatus:
             return 0
 
     def progress(self):
-        return f"{round(self.progress_raw(), 2)}%"
+        return f"{round(self._obj.progress_raw, 2)}%"
 
     def speed(self):
         return f"{get_readable_file_size(self._obj.speed)}/s"

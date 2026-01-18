@@ -623,6 +623,7 @@ class Encode(TaskListener):
             await self.on_upload_error("No valid video files found.")
             return
 
+        self.size = max_size
         file_path = target_file
 
         # Resolve MUX Link if present

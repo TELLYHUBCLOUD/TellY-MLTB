@@ -479,10 +479,8 @@ class FFMpeg:
     async def cancel_task(self):
         self._listener.is_cancelled = True
         if self._listener.subproc:
-            try:
+            with contextlib.suppress(Exception):
                 self._listener.subproc.kill()
-            except Exception:
-                pass
 
     @property
     def processed_bytes(self):

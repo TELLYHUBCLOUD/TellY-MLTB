@@ -385,7 +385,9 @@ Add to Playlist ID: <code>{yt_add_to_playlist_id}</code>"""
         text = f"<u>Set Default YouTube Folder Upload Mode for {name}</u>"
     elif stype == "videotools":
         buttons.data_button("Video Quality", f"userset {user_id} video_quality_menu")
-        buttons.data_button("Video Extension", f"userset {user_id} video_extension_menu")
+        buttons.data_button(
+            "Video Extension", f"userset {user_id} video_extension_menu"
+        )
         buttons.data_button("Watermark", f"userset {user_id} menu WATERMARK_KEY")
         buttons.data_button("CRF", f"userset {user_id} menu VIDEO_CRF")
         buttons.data_button("Metadata", f"userset {user_id} menu METADATA_KEY")
@@ -436,18 +438,37 @@ Add to Playlist ID: <code>{yt_add_to_playlist_id}</code>"""
 
 <i>These settings are used as defaults in the Video Tool and applied automatically when Auto VideoTool is enabled.</i>"""
     elif stype == "video_quality_menu":
-        options = ["Original", "1080p", "720p", "576p", "480p", "360p", "240p", "144p"]
+        options = [
+            "Original",
+            "1080p",
+            "720p",
+            "576p",
+            "480p",
+            "360p",
+            "240p",
+            "144p",
+        ]
         for opt in options:
-            prefix = "✅ " if user_dict.get("VIDEO_QUALITY", Config.VIDEO_QUALITY) == opt else ""
-            buttons.data_button(f"{prefix}{opt}", f"userset {user_id} set_v_qual {opt}")
+            prefix = (
+                "✅ "
+                if user_dict.get("VIDEO_QUALITY", Config.VIDEO_QUALITY) == opt
+                else ""
+            )
+            buttons.data_button(
+                f"{prefix}{opt}", f"userset {user_id} set_v_qual {opt}"
+            )
         buttons.data_button("Back", f"userset {user_id} videotools")
         buttons.data_button("Close", f"userset {user_id} close")
         text = f"<u>Select Default Video Quality for {name}</u>"
     elif stype == "video_extension_menu":
         options = ["Original", "mp4", "mkv", "mov", "avi", "webm"]
         for opt in options:
-            prefix = "✅ " if user_dict.get("VIDEO_EXT", Config.VIDEO_EXT) == opt else ""
-            buttons.data_button(f"{prefix}{opt}", f"userset {user_id} set_v_ext {opt}")
+            prefix = (
+                "✅ " if user_dict.get("VIDEO_EXT", Config.VIDEO_EXT) == opt else ""
+            )
+            buttons.data_button(
+                f"{prefix}{opt}", f"userset {user_id} set_v_ext {opt}"
+            )
         buttons.data_button("Back", f"userset {user_id} videotools")
         buttons.data_button("Close", f"userset {user_id} close")
         text = f"<u>Select Default Video Extension for {name}</u>"
@@ -911,7 +932,13 @@ async def get_menu(option, message, user_id):
         back_to = "youtube"
     elif option in ["RENAME_TEMPLATE", "START_EPISODE", "START_SEASON"]:
         back_to = "auto_rename"
-    elif option in ["VIDEO_QUALITY", "VIDEO_EXT", "WATERMARK_KEY", "METADATA_KEY", "VIDEO_CRF"]:
+    elif option in [
+        "VIDEO_QUALITY",
+        "VIDEO_EXT",
+        "WATERMARK_KEY",
+        "METADATA_KEY",
+        "VIDEO_CRF",
+    ]:
         back_to = "videotools"
     else:
         back_to = "back"

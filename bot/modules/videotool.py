@@ -183,7 +183,7 @@ class EncodeSelection:
         buttons.data_button("Done", "enc done")
         buttons.data_button("Cancel", "enc cancel")
 
-        msg_text = f"<b>Video Tool Settings</b>\n"
+        msg_text = "<b>Video Tool Settings</b>\n"
         msg_text += f"<b>• Quality:</b> {self.quality}\n"
         msg_text += f"<b>• CRF:</b> {self.crf}\n"
         msg_text += f"<b>• Convert:</b> {self.mode}\n"

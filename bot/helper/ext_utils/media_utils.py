@@ -476,6 +476,14 @@ class FFMpeg:
         self._time_rate = 0.1
         self._start_time = 0
 
+    async def cancel_task(self):
+        self._listener.is_cancelled = True
+        if self._listener.subproc:
+            try:
+                self._listener.subproc.kill()
+            except Exception:
+                pass
+
     @property
     def processed_bytes(self):
         return self._processed_bytes

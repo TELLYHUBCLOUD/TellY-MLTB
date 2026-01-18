@@ -183,13 +183,25 @@ class EncodeSelection:
         buttons.data_button("Done", "enc done")
         buttons.data_button("Cancel", "enc cancel")
 
-        msg_text = (
-            f"<b>Video Tool Settings</b>\n"
-            f"Quality: {self.quality}\n"
-            f"CRF: {self.crf}\n"
-            f"Convert: {self.mode}\n"
-            f"Timeout: {get_readable_time(self._timeout - (time() - self._start_time))}\n"
-        )
+        msg_text = f"<b>Video Tool Settings</b>\n"
+        msg_text += f"<b>• Quality:</b> {self.quality}\n"
+        msg_text += f"<b>• CRF:</b> {self.crf}\n"
+        msg_text += f"<b>• Convert:</b> {self.mode}\n"
+
+        if self.listener.new_name:
+            msg_text += f"<b>• Rename:</b> {self.listener.new_name}\n"
+        if self.listener.trim_start:
+            msg_text += f"<b>• Trim:</b> {self.listener.trim_start} - {self.listener.trim_end}\n"
+        if self.listener.watermark_text:
+            msg_text += f"<b>• Watermark:</b> {self.listener.watermark_text}\n"
+        if self.listener.metadata:
+            msg_text += f"<b>• Metadata:</b> {self.listener.metadata}\n"
+        if self.listener.subsync_offset:
+            msg_text += f"<b>• SubSync:</b> {self.listener.subsync_offset}\n"
+        if self.listener.mux_type:
+            msg_text += f"<b>• Mux:</b> {self.listener.mux_type.replace('mux_', '').upper()}\n"
+
+        msg_text += f"\n<b>• Timeout:</b> {get_readable_time(self._timeout - (time() - self._start_time))}\n"
         markup = buttons.build_menu(2)
         if not self._reply_to:
             self._reply_to = await send_message(
@@ -322,7 +334,8 @@ class EncodeSelection:
                 self.listener.metadata = text
             elif action == "crf":
                 with contextlib.suppress(BaseException):
-                    self.listener.crf = int(text)
+                    self.crf = int(text)
+                    self.listener.crf = self.crf
             elif action == "subsync":
                 self.listener.subsync_offset = text
             elif action.startswith("mux_"):

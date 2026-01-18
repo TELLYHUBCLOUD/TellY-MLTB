@@ -77,7 +77,6 @@ class ButtonMaker:
             "Sudo": "👮",
             "Authorize": "🔓",
             "Unauthorize": "🔒",
-
             # Links & Cloud
             "Cloud Link": "☁️",
             "Rclone Link": "📁",
@@ -94,7 +93,6 @@ class ButtonMaker:
             "Pixeldrain": "💧",
             "BuzzHeavier": "🐝",
             "Terabox": "📦",
-
             # Media & Video Tool
             "Video Tool": "🎬",
             "Video + Audio": "🎞️",
@@ -120,7 +118,6 @@ class ButtonMaker:
             "Media": "🎞️",
             "Spectrum": "📊",
             "Mediainfo": "ℹ️",
-
             # Task States
             "Seeding": "🌱",
             "Queued": "⏳",
@@ -135,7 +132,6 @@ class ButtonMaker:
             "Leech": "🩸",
             "Upload": "📤",
             "Download": "📥",
-
             # Bots & Tools
             "Aria2": "📥",
             "Torrent": "🧲",
@@ -152,7 +148,6 @@ class ButtonMaker:
             "Speedtest": "🚀",
             "Broadcast": "📢",
             "Count": "🔢",
-
             # Files & Misc
             "File": "📄",
             "Folder": "📁",
@@ -164,7 +159,7 @@ class ButtonMaker:
             "Zip": "📦",
             "Rar": "📦",
             "7z": "📦",
-            "All": "🌟"
+            "All": "🌟",
         }
         for word, emoji in mapping.items():
             if word.lower() in key.lower() and emoji not in key:

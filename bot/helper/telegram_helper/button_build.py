@@ -8,6 +8,7 @@ class ButtonMaker:
         self._footer_button = []
 
     def url_button(self, key, link, position=None):
+        key = self._add_emoji(key)
         if not position:
             self._button.append(InlineKeyboardButton(text=key, url=link))
         elif position == "header":
@@ -16,6 +17,7 @@ class ButtonMaker:
             self._footer_button.append(InlineKeyboardButton(text=key, url=link))
 
     def data_button(self, key, data, position=None):
+        key = self._add_emoji(key)
         if not position:
             self._button.append(InlineKeyboardButton(text=key, callback_data=data))
         elif position == "header":
@@ -26,6 +28,23 @@ class ButtonMaker:
             self._footer_button.append(
                 InlineKeyboardButton(text=key, callback_data=data),
             )
+
+    def _add_emoji(self, key):
+        mapping = {
+            "Cancel": "❌", "Stop": "🛑", "Resume": "▶️", "Pause": "⏸️",
+            "Settings": "⚙️", "Help": "❓", "Select": "✅", "Cloud Link": "☁️",
+            "Rclone Link": "📁", "Index Link": "🔗", "View Link": "🌐",
+            "View": "🔎", "Join": "🤝", "Subscribe": "🔔", "Back": "⬅️",
+            "Close": "🔐", "Next": "➡️", "Previous": "⬅️", "Stats": "📊",
+            "Mirror": "🪞", "Leech": "🩸", "Upload": "📤", "Download": "📥",
+            "Search": "🔎", "All": "🌟", "Gdrive": "📀", "Rclone": "📂",
+            "Pixeldrain": "💧", "GoFile": "📁", "BuzzHeavier": "🐝",
+            "Thumbnail": "🖼️", "Config": "🛠️"
+        }
+        for word, emoji in mapping.items():
+            if word.lower() in key.lower() and emoji not in key:
+                return f"{emoji} {key}"
+        return key
 
     def build_menu(self, b_cols=1, h_cols=8, f_cols=8):
         menu = [
